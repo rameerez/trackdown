@@ -1,24 +1,68 @@
-# Trackdown
+# 📍 `trackdown` - Ruby gem to geolocate IPs (MaxMind BYOK)
 
-TODO: Delete this and the text below, and describe your gem
+`trackdown` is a Ruby gem that provides simple & straightforward IP geolocation functionality using MaxMind databases. Just bring your keys and start geolocating IPs.
 
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/trackdown`. To experiment with that code, run `bin/console` for an interactive prompt.
+Given an IP, it gives you the corresponding:
+- 🗺️ Country (two-letter country code + country name)
+- 📍 City
+- 🇺🇸 Emoji flag of the country
+
+`trackdown` is BYOK (Bring Your Own Key) – you'll need your own MaxMind keys for it to work. [TODO: add link to where to get it]
 
 ## Installation
 
-TODO: Replace `UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG` with your gem name right after releasing it to RubyGems.org. Please do not do it earlier due to security reasons. Alternatively, replace this section with instructions to install your gem from git if you don't plan to release to RubyGems.org.
+Add this line to your application's Gemfile:
 
-Install the gem and add to the application's Gemfile by executing:
+```ruby
+gem 'trackdown'
+```
 
-    $ bundle add UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
+And then execute:
 
-If bundler is not being used to manage dependencies, install the gem by executing:
+```bash
+bundle install
+```
 
-    $ gem install UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
+## Setup
+
+First, run the installation generator:
+
+```bash
+rails generate trackdown:install
+```
+
+This will create an initializer file at `config/initializers/trackdown.rb`. Open this file and add your MaxMind license key and account ID:
+
+```ruby
+Trackdown.configure do |config|
+  config.maxmind_license_key = 'your_license_key_here'
+  config.maxmind_account_id = 'your_account_id_here'
+end
+```
+
+The generator also creates a rake task for updating the MaxMind database and adds a weekly schedule to `config/schedule.rb` for automatic updates.
 
 ## Usage
 
-TODO: Write usage instructions here
+To geolocate an IP address:
+
+```ruby
+Trackdown.locate('8.8.8.8')
+# => { country_code: 'US', city: 'Mountain View', emoji_flag: '🇺🇸' }
+```
+
+You can also do things like:
+```ruby
+Trackdown.locate('8.8.8.8').emoji
+# => '🇺🇸'
+```
+
+To manually update the MaxMind IP database:
+
+```ruby
+Trackdown.update_database
+```
+
 
 ## Development
 
