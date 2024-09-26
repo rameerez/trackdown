@@ -1,13 +1,13 @@
 # 📍 `trackdown` - Ruby gem to geolocate IPs (MaxMind BYOK)
 
-`trackdown` is a Ruby gem that provides simple & straightforward IP geolocation functionality using MaxMind databases. Just bring your keys and start geolocating IPs.
+`trackdown` is a Ruby gem that provides simple & straightforward IP geolocation functionality using MaxMind databases. Just bring your own MaxMind keys, and start geolocating IPs.
 
 Given an IP, it gives you the corresponding:
 - 🗺️ Country (two-letter country code + country name)
 - 📍 City
 - 🇺🇸 Emoji flag of the country
 
-`trackdown` is BYOK (Bring Your Own Key) – you'll need your own MaxMind keys for it to work. [TODO: add link to where to get it]
+`trackdown` is BYOK (Bring Your Own Key) – you'll need your own MaxMind keys for it to work. It's your responsibility to make sure your app complies with the license for the MaxMind database you're using. [TODO: add link to where to get it]
 
 ## Installation
 
