@@ -1,5 +1,6 @@
 require 'open-uri'
 require 'zlib'
+require 'rubygems/package'
 
 module Trackdown
   class DatabaseUpdater
@@ -13,8 +14,15 @@ module Trackdown
         URI.open(download_url,
                  http_basic_authentication: [Trackdown.configuration.maxmind_account_id, Trackdown.configuration.maxmind_license_key]) do |remote_file|
           Zlib::GzipReader.wrap(remote_file) do |gz|
-            File.open(Trackdown.configuration.database_path, 'wb') do |local_file|
-              local_file.write(remote_file)
+            Gem::Package::TarReader.new(gz) do |tar|
+              tar.each do |entry|
+                if entry.full_name.end_with?('.mmdb')
+                  File.open(Trackdown.configuration.database_path, 'wb') do |file|
+                    file.write(entry.read)
+                  end
+                  break
+                end
+              end
             end
           end
         end
