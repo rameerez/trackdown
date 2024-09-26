@@ -21,10 +21,21 @@ module Trackdown
   end
 
   def self.locate(ip)
+    ensure_database_exists!
     IpLocator.locate(ip)
   end
 
   def self.update_database
     DatabaseUpdater.update
+  end
+
+  def self.database_exists?
+    File.exist?(configuration.database_path)
+  end
+
+  def self.ensure_database_exists!
+    unless database_exists?
+      raise Error, "MaxMind database not found. Please set your MaxMind keys and run Trackdown.update_database to download the database."
+    end
   end
 end
