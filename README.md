@@ -35,6 +35,7 @@ This will create an initializer file at `config/initializers/trackdown.rb`. Open
 
 ```ruby
 Trackdown.configure do |config|
+  # Tip: do not write your plaintext keys in the code, use Rails.application.credentials instead
   config.maxmind_license_key = 'your_license_key_here'
   config.maxmind_account_id = 'your_account_id_here'
 end
@@ -47,8 +48,8 @@ The generator also creates a rake task for updating the MaxMind database and add
 To geolocate an IP address:
 
 ```ruby
-Trackdown.locate('8.8.8.8')
-# => { country_code: 'US', city: 'Mountain View', emoji_flag: '🇺🇸' }
+Trackdown.locate('8.8.8.8').country
+# => 'United States'
 ```
 
 You can also do things like:
@@ -57,8 +58,30 @@ Trackdown.locate('8.8.8.8').emoji
 # => '🇺🇸'
 ```
 
-To manually update the MaxMind IP database:
+In fact, there are a few methods you can use:
+```ruby
+result = Trackdown.locate('8.8.8.8')
 
+result.country_code    # => 'US'
+result.country_name    # => 'United States'
+result.country         # => 'United States' (alias for country_name)
+result.city            # => 'Mountain View'
+result.flag_emoji      # => '🇺🇸'
+result.emoji           # => '🇺🇸' (alias for flag_emoji)
+```
+
+If you prefer, you can also get all the information as a hash:
+```ruby
+result.to_h
+# => {
+#      country_code: 'US',
+#      country_name: 'United States',
+#      city: 'Mountain View',
+#      flag_emoji: '🇺🇸'
+#    }
+```
+
+To manually update the MaxMind IP database:
 ```ruby
 Trackdown.update_database
 ```

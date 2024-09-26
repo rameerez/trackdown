@@ -1,36 +1,16 @@
 require 'maxmind/db'
+require_relative 'location_result'
 
 module Trackdown
-  class LocationResult
-    attr_reader :country_code, :city, :emoji_flag
-
-    def initialize(country_code, city, emoji_flag)
-      @country_code = country_code
-      @city = city
-      @emoji_flag = emoji_flag
-    end
-
-    def emoji
-      @emoji_flag
-    end
-
-    def to_h
-      {
-        country_code: @country_code,
-        city: @city,
-        emoji_flag: @emoji_flag
-      }
-    end
-  end
-
   class IpLocator
     class << self
       def locate(ip)
         record = fetch_record(ip)
         country_code = extract_country_code(record)
+        country_name = extract_country_name(record)
         city = extract_city(record)
-        emoji_flag = get_emoji_flag(country_code)
-        LocationResult.new(country_code, city, emoji_flag)
+        flag_emoji = get_emoji_flag(country_code)
+        LocationResult.new(country_code, country_name, city, flag_emoji)
       end
 
       private
@@ -52,14 +32,20 @@ module Trackdown
         record&.dig('country', 'iso_code')
       end
 
+      def extract_country_name(record)
+        record&.dig('country', 'names', 'en') ||
+          (record&.dig('country', 'names')&.values&.first) ||
+          'Unknown'
+      end
+
       def extract_city(record)
         record&.dig('city', 'names', 'en') ||
           (record&.dig('city', 'names')&.values&.first) ||
-          'unknown'
+          'Unknown'
       end
 
       def get_emoji_flag(country_code)
-        country_code ? country_code.tr('A-Z', "\u{1F1E6}-\u{1F1FF}") : "❔"
+        country_code ? country_code.tr('A-Z', "\u{1F1E6}-\u{1F1FF}") : "🏳️"
       end
     end
   end

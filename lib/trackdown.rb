@@ -4,6 +4,7 @@ require_relative "trackdown/version"
 require_relative "trackdown/configuration"
 require_relative "trackdown/ip_locator"
 require_relative "trackdown/database_updater"
+require_relative "trackdown/location_result"
 
 module Trackdown
   class Error < StandardError; end
