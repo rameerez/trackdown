@@ -8,8 +8,8 @@ Gem::Specification.new do |spec|
   spec.authors = ["rameerez"]
   spec.email = ["rubygems@rameerez.com"]
 
-  spec.summary = "A Ruby gem for IP geolocation using MaxMind databases"
-  spec.description = "Trackdown is a Ruby gem that provides easy-to-use IP geolocation functionality using MaxMind databases. It offers a simple API for Rails applications to fetch country, city, and emoji flag information from IP addresses."
+  spec.summary = "A Ruby gem for geolocating IP addresses using databases like MaxMind"
+  spec.description = "Trackdown is a Ruby gem that easily allows you to geolocate IP addresses. It's an easy-to-use, handy, straightforward wrapper around existing databases like MaxMind. Plug your API keys and you're good to go. It offers a simple API for Rails applications to fetch country, city, and emoji flag information from IP addresses."
   spec.homepage = "https://github.com/rameerez/trackdown"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.0.0"
@@ -34,7 +34,7 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   spec.add_dependency "maxmind-db", "~> 1.1"
-  spec.add_dependency "whenever", "~> 1.0"
+  spec.add_dependency "countries", "~> 7.0"
 
   spec.add_development_dependency "rake", "~> 13.0"
   spec.add_development_dependency "rspec", "~> 3.0"
