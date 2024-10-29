@@ -11,6 +11,14 @@ module Trackdown
         template 'trackdown_database_refresh_job.rb', 'app/jobs/trackdown_database_refresh_job.rb'
       end
 
+      def add_mmdb_to_gitignore
+        if File.exist?('.gitignore')
+          append_to_file '.gitignore', "\n\n# Trackdown\n*.mmdb"
+        else
+          create_file '.gitignore', "# Trackdown\n*.mmdb"
+        end
+      end
+
       def display_post_install_message
         say "\tThe `trackdown` gem has been successfully installed!", :green
         say "\nTo complete the setup:"
