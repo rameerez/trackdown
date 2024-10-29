@@ -36,7 +36,7 @@ module Trackdown
 
   def self.ensure_database_exists!
     unless database_exists?
-      raise Error, "MaxMind database not found. Please set your MaxMind keys in config/initializers/trackdown.rb as described in the `trackdown` gem README, and then run Trackdown.update_database to download the database."
+      raise Error, "MaxMind database not found. Please set your MaxMind keys in config/initializers/trackdown.rb as described in the `trackdown` gem README, and then run Trackdown.update_database to download the MaxMind IP geolocation database."
     end
   end
 end

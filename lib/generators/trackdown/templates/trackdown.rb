@@ -1,5 +1,4 @@
 Trackdown.configure do |config|
-  config.maxmind_license_key = "your_license_key_here"
-  config.maxmind_account_id = "your_account_id_here"
-  # config.database_path = Rails.root.join("db", "GeoLite2-City.mmdb").to_s
+  config.maxmind_account_id = Rails.application.credentials.dig("maxmind", "account_id")
+  config.maxmind_license_key = Rails.application.credentials.dig("maxmind", "license_key")
 end
