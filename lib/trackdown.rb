@@ -19,7 +19,6 @@ module Trackdown
 
   def self.configure
     yield(configuration)
-    configuration.validate!
   end
 
   def self.locate(ip)
