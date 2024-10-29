@@ -1,15 +1,31 @@
+# frozen_string_literal: true
+
 require 'maxmind/db'
+require 'connection_pool'
 require_relative 'location_result'
+require_relative 'ip_validator'
 
 module Trackdown
   class IpLocator
+    class TimeoutError < Trackdown::Error; end
+    class DatabaseError < Trackdown::Error; end
+
     class << self
       def locate(ip)
+        IpValidator.validate!(ip)
+
+        if Trackdown.configuration.reject_private_ips? && IpValidator.private_ip?(ip)
+          raise IpValidator::InvalidIpError, "Private IP addresses are not allowed"
+        end
+
         record = fetch_record(ip)
+        return LocationResult.new(nil, 'Unknown', 'Unknown', '🏳️') if record.nil?
+
         country_code = extract_country_code(record)
         country_name = extract_country_name(record)
         city = extract_city(record)
         flag_emoji = get_emoji_flag(country_code)
+
         LocationResult.new(country_code, country_name, city, flag_emoji)
       end
 
@@ -17,15 +33,31 @@ module Trackdown
 
       def fetch_record(ip)
         Trackdown.ensure_database_exists!
-        reader = MaxMind::DB.new(Trackdown.configuration.database_path, mode: MaxMind::DB::MODE_MEMORY)
-        record = reader.get(ip)
-        reader.close
-        record
+
+        Timeout.timeout(Trackdown.configuration.timeout) do
+          reader_pool.with do |reader|
+            reader.get(ip)
+          end
+        end
+      rescue Timeout::Error
+        raise TimeoutError, "MaxMind database lookup timed out after #{Trackdown.configuration.timeout} seconds"
       rescue Trackdown::Error => e
         raise e
-      rescue => e
+      rescue StandardError => e
         Rails.logger.error("Error fetching IP data: #{e.message}") if defined?(Rails)
-        nil
+        raise DatabaseError, "Database error: #{e.message}"
+      end
+
+      def reader_pool
+        @reader_pool ||= ConnectionPool.new(
+          size: Trackdown.configuration.pool_size,
+          timeout: Trackdown.configuration.pool_timeout
+        ) do
+          MaxMind::DB.new(
+            Trackdown.configuration.database_path,
+            mode: Trackdown.configuration.memory_mode
+          )
+        end
       end
 
       def extract_country_code(record)

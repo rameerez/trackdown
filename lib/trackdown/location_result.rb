@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Trackdown
   class LocationResult
     attr_reader :country_code, :country_name, :city, :flag_emoji

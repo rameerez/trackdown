@@ -1,14 +1,14 @@
 # frozen_string_literal: true
 
+require_relative "trackdown/error"
 require_relative "trackdown/version"
 require_relative "trackdown/configuration"
+require_relative "trackdown/ip_validator"
 require_relative "trackdown/ip_locator"
 require_relative "trackdown/database_updater"
 require_relative "trackdown/location_result"
 
 module Trackdown
-  class Error < StandardError; end
-
   class << self
     attr_writer :configuration
   end
@@ -19,6 +19,7 @@ module Trackdown
 
   def self.configure
     yield(configuration)
+    configuration.validate!
   end
 
   def self.locate(ip)
