@@ -22,7 +22,7 @@ module Trackdown
       missing << 'maxmind_license_key' if maxmind_license_key.nil?
       missing << 'maxmind_account_id' if maxmind_account_id.nil?
 
-      raise Error, "Missing required configuration: #{missing.join(', ')}" unless missing.empty?
+      raise Error, "Missing required configuration: #{missing.join(', ')} – Please set these in your config/initializers/trackdown.rb initializer." unless missing.empty?
 
       validate_paths!
       validate_timeouts!
