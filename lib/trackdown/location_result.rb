@@ -16,6 +16,7 @@ module Trackdown
     alias_method :country, :country_name
     alias_method :emoji, :flag_emoji
     alias_method :emoji_flag, :flag_emoji
+    alias_method :country_flag, :flag_emoji
 
     def country_info
       return nil unless country_code
