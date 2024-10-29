@@ -8,8 +8,8 @@ Gem::Specification.new do |spec|
   spec.authors = ["rameerez"]
   spec.email = ["rubygems@rameerez.com"]
 
-  spec.summary = "A Ruby gem for geolocating IP addresses using databases like MaxMind"
-  spec.description = "Trackdown is a Ruby gem that easily allows you to geolocate IP addresses. It's an easy-to-use, handy, straightforward wrapper around existing databases like MaxMind. Plug your API keys and you're good to go. It offers a simple API for Rails applications to fetch country, city, and emoji flag information from IP addresses."
+  spec.summary = "A Ruby gem for geolocating IP addresses using a MaxMind database"
+  spec.description = "Trackdown is a Ruby gem that easily allows you to geolocate IP addresses. It's a simple, convenient wrapper on top of the MaxMind database. Plug your API keys and you're good to go. It keeps your MaxMind database updated regularly, and it offers a handy API for Rails applications to fetch country, city, and emoji flag information for any IP address."
   spec.homepage = "https://github.com/rameerez/trackdown"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.0.0"

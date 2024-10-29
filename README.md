@@ -1,13 +1,13 @@
 # 📍 `trackdown` - Ruby gem to geolocate IPs (MaxMind BYOK)
 
-`trackdown` is a Ruby gem that provides simple & straightforward IP geolocation functionality using MaxMind databases. Just bring your own MaxMind keys, and start geolocating IPs.
+`trackdown` is a Ruby gem that easily allows you to geolocate IP addresses. It's a simple, convenient wrapper on top of MaxMind. Just bring your own MaxMind keys, and you're good to go. It keeps your MaxMind database updated regularly, and it offers a handy API for Rails applications to fetch country, city, and emoji flag information for any IP address.
 
 Given an IP, it gives you the corresponding:
 - 🗺️ Country (two-letter country code + country name)
 - 📍 City
 - 🇺🇸 Emoji flag of the country
 
-`trackdown` is BYOK (Bring Your Own Key) – you'll need your own MaxMind keys for it to work. It's your responsibility to make sure your app complies with the license for the MaxMind database you're using. [TODO: add link to where to get it]
+`trackdown` is BYOK (Bring Your Own Key) – you'll need your own MaxMind keys for it to work. It's your responsibility to make sure your app complies with the license for the MaxMind database you're using. Get a MaxMind account and license key at [MaxMind](https://www.maxmind.com/).
 
 ## Installation
 
@@ -36,12 +36,38 @@ This will create an initializer file at `config/initializers/trackdown.rb`. Open
 ```ruby
 Trackdown.configure do |config|
   # Tip: do not write your plaintext keys in the code, use Rails.application.credentials instead
-  config.maxmind_license_key = 'your_license_key_here'
   config.maxmind_account_id = 'your_account_id_here'
+  config.maxmind_license_key = 'your_license_key_here'
 end
 ```
 
-The generator also creates a rake task for updating the MaxMind database and adds a weekly schedule to `config/schedule.rb` for automatic updates.
+> [!TIP]
+> To get your MaxMind account ID and license key, you need to create an account at [MaxMind](https://www.maxmind.com/) and get a license key.
+
+You can also configure the path where the MaxMind database will be stored. By default, it will be stored at `db/GeoLite2-City.mmdb`:
+
+```ruby
+config.database_path = Rails.root.join('db', 'GeoLite2-City.mmdb').to_s
+```
+
+The generator also creates a `TrackdownDatabaseRefreshJob` job for regularly updating the MaxMind database. You can just get a database the first time and just keep using it, but the information will get outdated and some IPs will become stale or inaccurate.
+
+To keep your IP geolocation accurate, you need to make sure the `TrackdownDatabaseRefreshJob` runs regularly. How you do that, exactly, depends on the queueing system you're using.
+
+If you're using `solid_queue` (the Rails 8 default), you can easily add it to your schedule in the `config/recurring.yml` file like this:
+```yaml
+production:
+  refresh_maxmind_database:
+    class: TrackdownDatabaseRefreshJob
+    queue: default
+    schedule: every day at 4am US/Pacific
+```
+
+After setting everything up, you can run the following command to update the MaxMind database / get the first fresh copy of it:
+
+```ruby
+Trackdown.update_database
+```
 
 ## Usage
 
