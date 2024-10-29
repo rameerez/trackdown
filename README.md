@@ -57,7 +57,7 @@ To keep your IP geolocation accurate, you need to make sure the `TrackdownDataba
 If you're using `solid_queue` (the Rails 8 default), you can easily add it to your schedule in the `config/recurring.yml` file like this:
 ```yaml
 production:
-  refresh_maxmind_database:
+  refresh_trackdown_database:
     class: TrackdownDatabaseRefreshJob
     queue: default
     schedule: every week at 4am US/Pacific
