@@ -2,6 +2,7 @@ PATH
   remote: .
   specs:
     trackdown (0.1.0)
+      connection_pool (~> 2.4)
       countries (~> 7.0)
       maxmind-db (~> 1.1)
 
@@ -9,6 +10,7 @@ GEM
   remote: https://rubygems.org/
   specs:
     ast (2.4.2)
+    connection_pool (2.4.1)
     countries (7.0.0)
       unaccent (~> 0.3)
     diff-lcs (1.5.1)
