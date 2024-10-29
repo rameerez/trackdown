@@ -98,12 +98,14 @@ result.emoji           # => '🇺🇸' (alias for flag_emoji)
 result.country_flag    # => '🇺🇸' (alias for flag_emoji)
 ```
 
-For `country_info` we're leveraging the `countries` gem, so you get a lot of information about the country, like the continent, the region, the languages spoken, the currency, and more:
+For `country_info` we're leveraging the [`countries`](https://github.com/countries/countries) gem, so you get a lot of information about the country, like the continent, the region, the languages spoken, the currency, and more:
 
 ```ruby
 result.country_info.alpha3          # => "USA"
 result.country_info.currency_code   # => "USD"
-result.country_info.continent.name  # => 'North America'
+result.country_info.continent       # => 'North America'
+result.country_info.nationality     # => 'American'
+result.country_info.iso_long_name   # => 'The United States of America'
 ```
 
 If you prefer, you can also get all the information as a hash:
