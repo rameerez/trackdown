@@ -60,7 +60,7 @@ production:
   refresh_maxmind_database:
     class: TrackdownDatabaseRefreshJob
     queue: default
-    schedule: every day at 4am US/Pacific
+    schedule: every week at 4am US/Pacific
 ```
 
 After setting everything up, you can run the following command to update the MaxMind database / get the first fresh copy of it:
