@@ -91,6 +91,7 @@ result = Trackdown.locate('8.8.8.8')
 result.country_code    # => 'US'
 result.country_name    # => 'United States'
 result.country         # => 'United States' (alias for country_name)
+result.country_info    # => # A big hash of information about the country, from the `countries` gem
 result.city            # => 'Mountain View'
 result.flag_emoji      # => '🇺🇸'
 result.emoji           # => '🇺🇸' (alias for flag_emoji)
@@ -103,7 +104,8 @@ result.to_h
 #      country_code: 'US',
 #      country_name: 'United States',
 #      city: 'Mountain View',
-#      flag_emoji: '🇺🇸'
+#      flag_emoji: '🇺🇸',
+#      country_info: { ... }
 #    }
 ```
 
