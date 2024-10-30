@@ -60,8 +60,10 @@ production:
   refresh_trackdown_database:
     class: TrackdownDatabaseRefreshJob
     queue: default
-    schedule: every Monday at 4am US/Pacific
+    schedule: every Saturday at 4am US/Pacific
 ```
+
+_Note: MaxMind updates their databases [every Tuesday and Friday](https://dev.maxmind.com/geoip/geoip2/geoip2-update-process/)._
 
 After setting everything up, you can run the following command to update the MaxMind database / get the first fresh copy of it:
 
