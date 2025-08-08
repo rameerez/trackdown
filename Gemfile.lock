@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    trackdown (0.1.0)
+    trackdown (0.1.1)
       connection_pool (~> 2.4)
       countries (~> 7.0)
       maxmind-db (~> 1.2)
@@ -9,14 +9,25 @@ PATH
 GEM
   remote: https://rubygems.org/
   specs:
+    ansi (1.5.0)
     ast (2.4.2)
+    builder (3.3.0)
     connection_pool (2.4.1)
     countries (7.0.0)
       unaccent (~> 0.3)
     diff-lcs (1.5.1)
+    docile (1.4.1)
     json (2.7.4)
     language_server-protocol (3.17.0.3)
     maxmind-db (1.2.0)
+    minitest (5.25.5)
+    minitest-reporters (1.7.1)
+      ansi
+      builder
+      minitest (>= 5.0)
+      ruby-progressbar
+    mocha (2.7.1)
+      ruby2_keywords (>= 0.0.5)
     parallel (1.26.3)
     parser (3.3.5.0)
       ast (~> 2.4.1)
@@ -51,6 +62,13 @@ GEM
     rubocop-ast (1.32.3)
       parser (>= 3.3.1.0)
     ruby-progressbar (1.13.0)
+    ruby2_keywords (0.0.5)
+    simplecov (0.22.0)
+      docile (~> 1.1)
+      simplecov-html (~> 0.11)
+      simplecov_json_formatter (~> 0.1)
+    simplecov-html (0.13.2)
+    simplecov_json_formatter (0.1.4)
     unaccent (0.4.0)
     unicode-display_width (2.6.0)
 
@@ -59,9 +77,13 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  minitest (~> 5.22)
+  minitest-reporters (~> 1.6)
+  mocha (~> 2.1)
   rake (~> 13.0)
   rspec (~> 3.0)
   rubocop (~> 1.21)
+  simplecov (>= 0.21)
   trackdown!
 
 BUNDLED WITH

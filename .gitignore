@@ -1,3 +1,6 @@
+# / vendor files
+/vendor/
+
 /.bundle/
 /.yardoc
 /_yardoc/
@@ -6,6 +9,9 @@
 /pkg/
 /spec/reports/
 /tmp/
+
+# Trackdown
+*.mmdb
 
 TODO
 
