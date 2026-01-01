@@ -7,6 +7,9 @@
 /spec/reports/
 /tmp/
 
+.cursor/
+.claude/*.local.json
+
 TODO
 
 /dist
