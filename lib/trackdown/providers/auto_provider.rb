@@ -35,30 +35,27 @@ module Trackdown
             return MaxmindProvider.locate(ip, request: request)
           end
 
-          # No providers available
-          raise Trackdown::Error, no_provider_error_message
+          # No providers available - fail gracefully with a warning
+          warn_no_providers
+          LocationResult.new(nil, 'Unknown', 'Unknown', '🏳️')
         end
 
         private
 
-        def no_provider_error_message
-          <<~MSG
-            No IP geolocation provider available.
+        def warn_no_providers
+          # Only warn once per process to avoid log spam
+          return if @warned_no_providers
+          @warned_no_providers = true
 
-            To use Trackdown, you need at least one of:
+          message = "[Trackdown] No IP geolocation provider available. Returning 'Unknown' for all lookups. " \
+                    "Configure Cloudflare headers or MaxMind to enable geolocation. " \
+                    "See: https://github.com/rameerez/trackdown"
 
-            1. Cloudflare (recommended, zero-config):
-               - Your app must be behind Cloudflare
-               - Enable "IP Geolocation" in Cloudflare dashboard (Network settings)
-               - Pass the request object: Trackdown.locate(ip, request: request)
-
-            2. MaxMind database:
-               - Add to Gemfile: gem 'maxmind-db'
-               - Configure your MaxMind keys in config/initializers/trackdown.rb
-               - Run: Trackdown.update_database
-
-            See the Trackdown README for detailed setup instructions.
-          MSG
+          if defined?(Rails)
+            Rails.logger.warn(message)
+          else
+            warn(message)
+          end
         end
       end
     end
