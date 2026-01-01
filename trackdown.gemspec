@@ -44,8 +44,13 @@ Gem::Specification.new do |spec|
   # For Cloudflare provider: No additional gems required!
 
   spec.add_development_dependency "rake", "~> 13.0"
-  spec.add_development_dependency "rspec", "~> 3.0"
   spec.add_development_dependency "rubocop", "~> 1.21"
+
+  # Testing dependencies
+  spec.add_development_dependency "minitest", "~> 5.25"
+  spec.add_development_dependency "mocha", "~> 2.0"
+  spec.add_development_dependency "simplecov", "~> 0.22"
+  spec.add_development_dependency "webmock", "~> 3.0"
 
   # Optional dev dependencies for testing MaxMind provider
   spec.add_development_dependency "maxmind-db", "~> 1.2"
