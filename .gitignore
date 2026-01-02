@@ -7,6 +7,12 @@
 /spec/reports/
 /tmp/
 
+.aux/
+.cursor/
+.claude/*.local.json
+
 TODO
+
+Gemfile.lock
 
 /dist
