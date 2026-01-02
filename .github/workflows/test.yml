@@ -1,0 +1,50 @@
+name: Tests
+
+on:
+  pull_request:
+    paths-ignore:
+      - "README.md"
+      - "CHANGELOG.md"
+      - "LICENSE.txt"
+      - "*.md"
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "README.md"
+      - "CHANGELOG.md"
+      - "LICENSE.txt"
+      - "*.md"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby_version: ["3.2", "3.3", "3.4", "4.0"]
+        rails_version: ["7.1.6", "8.1.1"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby ${{ matrix.ruby_version }}
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby_version }}
+          bundler-cache: true
+        env:
+          RAILS_VERSION: ${{ matrix.rails_version }}
+
+      - name: Run tests
+        run: bundle exec rake test
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-ruby-${{ matrix.ruby_version }}-${{ matrix.rails_version }}
+          path: test/reports/
+          retention-days: 7
