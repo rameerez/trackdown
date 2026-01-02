@@ -13,6 +13,9 @@ module Trackdown
     #
     # This is the recommended default for most applications
     class AutoProvider < BaseProvider
+      @@warned_no_providers = false
+      @@warn_mutex = Mutex.new
+
       class << self
         # Auto provider is available if at least one provider is available
         def available?(request: nil)
@@ -44,17 +47,21 @@ module Trackdown
 
         def warn_no_providers
           # Only warn once per process to avoid log spam
-          return if @warned_no_providers
-          @warned_no_providers = true
+          return if @@warned_no_providers
 
-          message = "[Trackdown] No IP geolocation provider available. Returning 'Unknown' for all lookups. " \
-                    "Configure Cloudflare headers or MaxMind to enable geolocation. " \
-                    "See: https://github.com/rameerez/trackdown"
+          @@warn_mutex.synchronize do
+            return if @@warned_no_providers
+            @@warned_no_providers = true
 
-          if defined?(Rails)
-            Rails.logger.warn(message)
-          else
-            warn(message)
+            message = "[Trackdown] No IP geolocation provider available. Returning 'Unknown' for all lookups. " \
+                      "Configure Cloudflare headers or MaxMind to enable geolocation. " \
+                      "See: https://github.com/rameerez/trackdown"
+
+            if defined?(Rails)
+              Rails.logger.warn(message)
+            else
+              warn(message)
+            end
           end
         end
       end

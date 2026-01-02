@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'timeout'
 require_relative 'base_provider'
 require_relative '../location_result'
 

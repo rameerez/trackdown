@@ -31,7 +31,7 @@ module Trackdown
 
         country = ISO3166::Country.new(country_code)
         country&.iso_short_name || country&.name || 'Unknown'
-      rescue
+      rescue StandardError
         'Unknown'
       end
     end
