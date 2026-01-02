@@ -7,7 +7,7 @@ module Trackdown
     class BaseProvider
       # Returns true if this provider can handle the given request/context
       def self.available?(request: nil)
-        raise NotImplementedError, "#{self.class} must implement .available?"
+        raise NotImplementedError, "#{self} must implement .available?"
       end
 
       # Locates the IP and returns a LocationResult
@@ -15,7 +15,7 @@ module Trackdown
       # @param request [ActionDispatch::Request, nil] Optional Rails request object for header access
       # @return [LocationResult] The location information
       def self.locate(ip, request: nil)
-        raise NotImplementedError, "#{self.class} must implement .locate"
+        raise NotImplementedError, "#{self} must implement .locate"
       end
 
       protected
