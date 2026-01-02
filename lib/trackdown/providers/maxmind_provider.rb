@@ -20,6 +20,9 @@ module Trackdown
       class TimeoutError < Trackdown::Error; end
       class DatabaseError < Trackdown::Error; end
 
+      @@reader_pool = nil
+      @@pool_mutex = Mutex.new
+
       class << self
         # Check if MaxMind database is available
         def available?(request: nil)
@@ -70,14 +73,18 @@ module Trackdown
         end
 
         def reader_pool
-          @reader_pool ||= ConnectionPool.new(
-            size: Trackdown.configuration.pool_size,
-            timeout: Trackdown.configuration.pool_timeout
-          ) do
-            MaxMind::DB.new(
-              Trackdown.configuration.database_path,
-              mode: Trackdown.configuration.memory_mode
-            )
+          return @@reader_pool if @@reader_pool
+
+          @@pool_mutex.synchronize do
+            @@reader_pool ||= ConnectionPool.new(
+              size: Trackdown.configuration.pool_size,
+              timeout: Trackdown.configuration.pool_timeout
+            ) do
+              MaxMind::DB.new(
+                Trackdown.configuration.database_path,
+                mode: Trackdown.configuration.memory_mode
+              )
+            end
           end
         end
 
