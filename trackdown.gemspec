@@ -9,7 +9,7 @@ Gem::Specification.new do |spec|
   spec.email = ["rubygems@rameerez.com"]
 
   spec.summary = "Get country, city, and emoji flag information for IP addresses using Cloudflare or MaxMind"
-  spec.description = "Trackdown is a Ruby gem that easily allows you to geolocate IP addresses. It works out of the box with Cloudflare headers if you're using it, or you can use MaxMind (BYOK). The gem offers a clean API for Rails applications to fetch country, city, and emoji flag information for any IP address. Supports Cloudflare headers (instant, zero overhead) and MaxMind GeoLite2 database (offline capable)."
+  spec.description = "Trackdown is a Ruby gem that allows you to geolocate IP addresses easily. It works out of the box with Cloudflare headers if your Rails app is behind it; or you can also use MaxMind databases (BYOK). The gem offers a clean API for Rails applications to fetch country, city, emoji flag, region, continent, postal code, latitude, longitude and other GeoIP information for any IP address. Supports Cloudflare headers, and MaxMind GeoLite2 databases (offline capable)."
   spec.homepage = "https://github.com/rameerez/trackdown"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.0.0"

@@ -3,7 +3,11 @@
 > [!TIP]
 > **🚀 Ship your next Rails app 10x faster!** I've built **[RailsFast](https://railsfast.com/?ref=trackdown)**, a production-ready Rails boilerplate template that comes with everything you need to launch a software business in days, not weeks. Go [check it out](https://railsfast.com/?ref=trackdown)!
 
-`trackdown` is a Ruby gem that allows you to geolocate IP addresses easily. It works out-of-the-box with **Cloudflare** (zero config!); and it's also a simple, convenient wrapper on top of **MaxMind** (just bring your own MaxMind key, and you're good to go!). `trackdown` offers a clean API for Rails applications to fetch country, city, region, continent, timezone, coordinates, and emoji flag information for any IP address.
+`trackdown` is a Ruby gem that allows you to geolocate IP addresses easily.
+
+It works out-of-the-box with **Cloudflare** (zero config!); and it's also a simple, convenient wrapper on top of **MaxMind** (just bring your own MaxMind key, and you're good to go!).
+
+`trackdown` offers a clean API for Rails applications to fetch country, city, region, continent, timezone, coordinates, and emoji flag information for any IP address.
 
 Given an IP, it gives you the corresponding:
 - 🗺️ Country (two-letter country code + country name)
@@ -16,11 +20,11 @@ Given an IP, it gives you the corresponding:
 - 📺 Metro code (e.g. "807")
 - 🇺🇸 Emoji flag of the country
 
-## Two ways to use `trackdown`
+## First, choose your `trackdown` Geo IP provider
 
 ### Option 1: Cloudflare (recommended, zero config)
 
-If your app is behind Cloudflare, you can use `trackdown` with **zero configuration**:
+If your Rails app is behind Cloudflare, you can use `trackdown` with **zero configuration**:
 - No API keys needed
 - No database downloads
 - No external dependencies
