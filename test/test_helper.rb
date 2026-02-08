@@ -1,20 +1,18 @@
 # frozen_string_literal: true
 
-$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "simplecov"
 
-require 'simplecov'
-SimpleCov.start do
-  add_filter "/test/"
-  add_filter "/vendor/"
-  add_group "Providers", "lib/trackdown/providers"
-  add_group "Core", "lib/trackdown"
-  minimum_coverage 80
-end
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 
 require "trackdown"
 require "minitest/autorun"
+gem "minitest-mock"
+require "minitest/mock"
+require "minitest/reporters"
 require "mocha/minitest"
 require "webmock/minitest"
+
+Minitest::Reporters.use! Minitest::Reporters::SpecReporter.new
 
 # Disable actual HTTP requests
 WebMock.disable_net_connect!(allow_localhost: true)

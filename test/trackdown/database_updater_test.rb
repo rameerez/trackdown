@@ -100,6 +100,32 @@ class DatabaseUpdaterTest < Minitest::Test
     assert File.exist?(Trackdown.configuration.database_path)
   end
 
+  def test_update_raises_error_on_other_http_errors
+    url = /download.maxmind.com/
+
+    stub_request(:get, url)
+      .to_return(status: 500)
+
+    error = assert_raises(Trackdown::Error) do
+      Trackdown::DatabaseUpdater.update
+    end
+
+    assert_match(/HTTP Error/, error.message)
+  end
+
+  def test_update_raises_error_on_generic_failure
+    url = /download.maxmind.com/
+
+    stub_request(:get, url)
+      .to_return(body: 'not a valid gzip', status: 200)
+
+    error = assert_raises(Trackdown::Error) do
+      Trackdown::DatabaseUpdater.update
+    end
+
+    assert_match(/Failed to update database/, error.message)
+  end
+
   private
 
   # Helper to create a minimal valid tar.gz file with a .mmdb file

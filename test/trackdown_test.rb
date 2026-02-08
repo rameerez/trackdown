@@ -98,4 +98,102 @@ class TrackdownTest < Minitest::Test
 
     assert_equal :maxmind, Trackdown.configuration.provider
   end
+
+  # === Integration tests: end-to-end with new fields ===
+
+  def test_locate_with_cloudflare_request_returns_all_new_fields
+    Trackdown.configuration.provider = :cloudflare
+    request = mock_cloudflare_request_with_all_headers
+
+    result = Trackdown.locate('8.8.8.8', request: request)
+
+    assert_instance_of Trackdown::LocationResult, result
+    assert_equal 'US', result.country_code
+    assert_equal 'San Francisco', result.city
+    assert_equal 'California', result.region
+    assert_equal 'CA', result.region_code
+    assert_equal 'NA', result.continent
+    assert_equal 'America/Los_Angeles', result.timezone
+    assert_in_delta 37.7749, result.latitude
+    assert_in_delta(-122.4194, result.longitude)
+  end
+
+  def test_locate_with_maxmind_record_returns_all_new_fields
+    Trackdown.configuration.provider = :maxmind
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, full_maxmind_record do
+        result = Trackdown.locate('8.8.8.8')
+
+        assert_instance_of Trackdown::LocationResult, result
+        assert_equal 'US', result.country_code
+        assert_equal 'San Francisco', result.city
+        assert_equal 'California', result.region
+        assert_equal 'CA', result.region_code
+        assert_equal 'NA', result.continent
+        assert_equal 'America/Los_Angeles', result.timezone
+        assert_in_delta 37.7749, result.latitude
+        assert_in_delta(-122.4194, result.longitude)
+      end
+    end
+  end
+
+  def test_auto_provider_cloudflare_returns_new_fields
+    Trackdown.configuration.provider = :auto
+    request = mock_cloudflare_request_with_all_headers
+
+    result = Trackdown.locate('8.8.8.8', request: request)
+
+    assert_equal 'California', result.region
+    assert_equal 'CA', result.region_code
+    assert_equal 'NA', result.continent
+    assert_equal 'America/Los_Angeles', result.timezone
+    assert_in_delta 37.7749, result.latitude
+    assert_in_delta(-122.4194, result.longitude)
+  end
+
+  def test_auto_provider_maxmind_returns_new_fields
+    Trackdown.configuration.provider = :auto
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+
+    expected_result = Trackdown::LocationResult.new(
+      'US', 'United States', 'San Francisco', '🇺🇸',
+      region: 'California',
+      region_code: 'CA',
+      continent: 'NA',
+      timezone: 'America/Los_Angeles',
+      latitude: 37.7749,
+      longitude: -122.4194
+    )
+
+    Trackdown::Providers::AutoProvider.expects(:locate).with('8.8.8.8', request: nil).returns(expected_result)
+
+    result = Trackdown.locate('8.8.8.8')
+
+    assert_equal 'California', result.region
+    assert_equal 'CA', result.region_code
+    assert_equal 'NA', result.continent
+    assert_equal 'America/Los_Angeles', result.timezone
+    assert_in_delta 37.7749, result.latitude
+    assert_in_delta(-122.4194, result.longitude)
+  end
+
+  def test_locate_to_h_includes_all_fields_end_to_end
+    Trackdown.configuration.provider = :cloudflare
+    request = mock_cloudflare_request_with_all_headers
+
+    result = Trackdown.locate('8.8.8.8', request: request)
+    hash = result.to_h
+
+    assert_equal 'US', hash[:country_code]
+    assert_equal 'San Francisco', hash[:city]
+    assert_equal 'California', hash[:region]
+    assert_equal 'CA', hash[:region_code]
+    assert_equal 'NA', hash[:continent]
+    assert_equal 'America/Los_Angeles', hash[:timezone]
+    assert_in_delta 37.7749, hash[:latitude]
+    assert_in_delta(-122.4194, hash[:longitude])
+    refute_empty hash[:country_info]
+  end
 end

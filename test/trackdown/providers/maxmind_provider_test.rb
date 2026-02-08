@@ -227,4 +227,300 @@ class MaxmindProviderTest < Minitest::Test
       end
     end
   end
+
+  # === New fields: region, region_code, continent, timezone, latitude, longitude ===
+
+  def test_locate_extracts_region_with_english_name
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, full_maxmind_record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_equal 'California', result.region
+      end
+    end
+  end
+
+  def test_locate_extracts_region_falls_back_without_english_name
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+    record = full_maxmind_record
+    record['subdivisions'][0]['names'] = { 'de' => 'Kalifornien' }
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_equal 'Kalifornien', result.region
+      end
+    end
+  end
+
+  def test_locate_extracts_region_nil_when_no_subdivisions
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+    record = full_maxmind_record
+    record.delete('subdivisions')
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_nil result.region
+      end
+    end
+  end
+
+  def test_locate_extracts_region_code_present
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, full_maxmind_record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_equal 'CA', result.region_code
+      end
+    end
+  end
+
+  def test_locate_extracts_region_code_absent
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+    record = full_maxmind_record
+    record.delete('subdivisions')
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_nil result.region_code
+      end
+    end
+  end
+
+  def test_locate_extracts_continent_present
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, full_maxmind_record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_equal 'NA', result.continent
+      end
+    end
+  end
+
+  def test_locate_extracts_continent_absent
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+    record = full_maxmind_record
+    record.delete('continent')
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_nil result.continent
+      end
+    end
+  end
+
+  def test_locate_extracts_timezone_present
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, full_maxmind_record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_equal 'America/Los_Angeles', result.timezone
+      end
+    end
+  end
+
+  def test_locate_extracts_timezone_absent
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+    record = full_maxmind_record
+    record.delete('location')
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_nil result.timezone
+      end
+    end
+  end
+
+  def test_locate_extracts_latitude_present
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, full_maxmind_record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_in_delta 37.7749, result.latitude
+      end
+    end
+  end
+
+  def test_locate_extracts_longitude_present
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, full_maxmind_record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_in_delta(-122.4194, result.longitude)
+      end
+    end
+  end
+
+  def test_locate_latitude_absent_when_no_location
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+    record = full_maxmind_record
+    record.delete('location')
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_nil result.latitude
+        assert_nil result.longitude
+      end
+    end
+  end
+
+  def test_locate_latitude_longitude_zero_values
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+    record = full_maxmind_record
+    record['location']['latitude'] = 0.0
+    record['location']['longitude'] = 0.0
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_in_delta 0.0, result.latitude
+        assert_in_delta 0.0, result.longitude
+      end
+    end
+  end
+
+  def test_locate_multiple_subdivisions_extracts_first
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+    record = full_maxmind_record
+    record['subdivisions'] = [
+      { 'iso_code' => 'CA', 'names' => { 'en' => 'California' } },
+      { 'iso_code' => 'LA', 'names' => { 'en' => 'Los Angeles County' } }
+    ]
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_equal 'California', result.region
+        assert_equal 'CA', result.region_code
+      end
+    end
+  end
+
+  def test_locate_missing_subdivisions_key
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+    record = {
+      'country' => { 'iso_code' => 'US', 'names' => { 'en' => 'United States' } },
+      'city' => { 'names' => { 'en' => 'San Francisco' } }
+    }
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_nil result.region
+        assert_nil result.region_code
+      end
+    end
+  end
+
+  def test_locate_missing_location_key
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+    record = {
+      'country' => { 'iso_code' => 'US', 'names' => { 'en' => 'United States' } },
+      'city' => { 'names' => { 'en' => 'San Francisco' } }
+    }
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_nil result.timezone
+        assert_nil result.latitude
+        assert_nil result.longitude
+      end
+    end
+  end
+
+  def test_locate_empty_record_returns_unknown_with_nil_new_fields
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, nil do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_nil result.region
+        assert_nil result.region_code
+        assert_nil result.continent
+        assert_nil result.timezone
+        assert_nil result.latitude
+        assert_nil result.longitude
+      end
+    end
+  end
+
+  def test_locate_full_record_populates_all_new_fields
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, full_maxmind_record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_equal 'US', result.country_code
+        assert_equal 'United States', result.country_name
+        assert_equal 'San Francisco', result.city
+        assert_equal 'California', result.region
+        assert_equal 'CA', result.region_code
+        assert_equal 'NA', result.continent
+        assert_equal 'America/Los_Angeles', result.timezone
+        assert_in_delta 37.7749, result.latitude
+        assert_in_delta(-122.4194, result.longitude)
+      end
+    end
+  end
+
+  def test_locate_empty_subdivisions_array
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+    record = full_maxmind_record
+    record['subdivisions'] = []
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_nil result.region
+        assert_nil result.region_code
+      end
+    end
+  end
+
+  def test_locate_location_without_timezone
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+    record = full_maxmind_record
+    record['location'].delete('time_zone')
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_nil result.timezone
+        # latitude and longitude should still be present
+        assert_in_delta 37.7749, result.latitude
+      end
+    end
+  end
 end

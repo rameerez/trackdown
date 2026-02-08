@@ -48,7 +48,15 @@ module Trackdown
           city = extract_city(record)
           flag_emoji = get_emoji_flag(country_code)
 
-          LocationResult.new(country_code, country_name, city, flag_emoji)
+          LocationResult.new(
+            country_code, country_name, city, flag_emoji,
+            region: extract_region(record),
+            region_code: record&.dig('subdivisions', 0, 'iso_code'),
+            continent: record&.dig('continent', 'code'),
+            timezone: record&.dig('location', 'time_zone'),
+            latitude: record&.dig('location', 'latitude'),
+            longitude: record&.dig('location', 'longitude')
+          )
         end
 
         private
@@ -102,6 +110,11 @@ module Trackdown
           record&.dig('city', 'names', 'en') ||
             (record&.dig('city', 'names')&.values&.first) ||
             'Unknown'
+        end
+
+        def extract_region(record)
+          record&.dig('subdivisions', 0, 'names', 'en') ||
+            record&.dig('subdivisions', 0, 'names')&.values&.first
         end
       end
     end
