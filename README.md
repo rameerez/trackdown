@@ -290,7 +290,7 @@ Trackdown reads these headers directly from the request with zero overhead — n
 
 ### MaxMind Provider
 
-Downloads the GeoLite2-City database to your server and performs local lookups using connection pooling for performance.
+Downloads the [GeoLite2-City](https://dev.maxmind.com/geoip/docs/databases/city-and-country/) database to your server and performs local lookups using connection pooling for performance. All fields (`country`, `city`, `region`, `continent`, `timezone`, `latitude`, `longitude`, `postal_code`, `metro_code`) are extracted from the database record.
 
 
 ## Development
