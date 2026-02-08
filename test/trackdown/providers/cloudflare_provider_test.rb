@@ -124,4 +124,245 @@ class CloudflareProviderTest < Minitest::Test
       assert_equal expected_flag, result.flag_emoji
     end
   end
+
+  # === New header extraction tests ===
+
+  def test_locate_extracts_region_header
+    request = mock_cloudflare_request(country: 'US', city: 'San Francisco', region: 'California')
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_equal 'California', result.region
+  end
+
+  def test_locate_extracts_region_code_header
+    request = mock_cloudflare_request(country: 'US', city: 'San Francisco', region_code: 'CA')
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_equal 'CA', result.region_code
+  end
+
+  def test_locate_extracts_latitude_header
+    request = mock_cloudflare_request(country: 'US', city: 'San Francisco', latitude: '37.7749')
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_in_delta 37.7749, result.latitude
+  end
+
+  def test_locate_extracts_longitude_header
+    request = mock_cloudflare_request(country: 'US', city: 'San Francisco', longitude: '-122.4194')
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_in_delta(-122.4194, result.longitude)
+  end
+
+  def test_locate_extracts_timezone_header
+    request = mock_cloudflare_request(country: 'US', city: 'San Francisco', timezone: 'America/Los_Angeles')
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_equal 'America/Los_Angeles', result.timezone
+  end
+
+  def test_locate_extracts_continent_header
+    request = mock_cloudflare_request(country: 'US', city: 'San Francisco', continent: 'NA')
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_equal 'NA', result.continent
+  end
+
+  def test_locate_with_all_new_headers_present
+    request = mock_cloudflare_request_with_all_headers
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_equal 'US', result.country_code
+    assert_equal 'San Francisco', result.city
+    assert_equal 'California', result.region
+    assert_equal 'CA', result.region_code
+    assert_equal 'NA', result.continent
+    assert_equal 'America/Los_Angeles', result.timezone
+    assert_in_delta 37.7749, result.latitude
+    assert_in_delta(-122.4194, result.longitude)
+    assert_equal '94107', result.postal_code
+    assert_equal '807', result.metro_code
+  end
+
+  def test_locate_missing_region_header_returns_nil
+    request = mock_cloudflare_request(country: 'US', city: 'San Francisco')
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_nil result.region
+  end
+
+  def test_locate_missing_region_code_header_returns_nil
+    request = mock_cloudflare_request(country: 'US', city: 'San Francisco')
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_nil result.region_code
+  end
+
+  def test_locate_missing_latitude_header_returns_nil
+    request = mock_cloudflare_request(country: 'US', city: 'San Francisco')
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_nil result.latitude
+  end
+
+  def test_locate_missing_longitude_header_returns_nil
+    request = mock_cloudflare_request(country: 'US', city: 'San Francisco')
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_nil result.longitude
+  end
+
+  def test_locate_missing_timezone_header_returns_nil
+    request = mock_cloudflare_request(country: 'US', city: 'San Francisco')
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_nil result.timezone
+  end
+
+  def test_locate_missing_continent_header_returns_nil
+    request = mock_cloudflare_request(country: 'US', city: 'San Francisco')
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_nil result.continent
+  end
+
+  def test_locate_extracts_postal_code_header
+    request = mock_cloudflare_request(country: 'US', city: 'San Francisco', postal_code: '94107')
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_equal '94107', result.postal_code
+  end
+
+  def test_locate_extracts_metro_code_header
+    request = mock_cloudflare_request(country: 'US', city: 'San Francisco', metro_code: '807')
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_equal '807', result.metro_code
+  end
+
+  def test_locate_missing_postal_code_header_returns_nil
+    request = mock_cloudflare_request(country: 'US', city: 'San Francisco')
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_nil result.postal_code
+  end
+
+  def test_locate_missing_metro_code_header_returns_nil
+    request = mock_cloudflare_request(country: 'US', city: 'San Francisco')
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_nil result.metro_code
+  end
+
+  # === Latitude/longitude parsing edge cases ===
+
+  def test_parse_coordinate_with_valid_positive_float
+    request = mock_cloudflare_request(country: 'US', city: 'SF', latitude: '37.7749')
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_in_delta 37.7749, result.latitude
+  end
+
+  def test_parse_coordinate_with_valid_negative_float
+    request = mock_cloudflare_request(country: 'US', city: 'SF', longitude: '-122.5773')
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_in_delta(-122.5773, result.longitude)
+  end
+
+  def test_parse_coordinate_with_zero
+    request = mock_cloudflare_request(country: 'GH', city: 'Accra', latitude: '0', longitude: '0')
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_in_delta 0.0, result.latitude
+    assert_in_delta 0.0, result.longitude
+  end
+
+  def test_parse_coordinate_with_empty_string_returns_nil
+    request = Object.new
+    env = {
+      'HTTP_CF_IPCOUNTRY' => 'US',
+      'HTTP_CF_IPCITY' => 'SF',
+      'HTTP_CF_IPLATITUDE' => '',
+      'HTTP_CF_IPLONGITUDE' => ''
+    }
+    request.define_singleton_method(:env) { env }
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_nil result.latitude
+    assert_nil result.longitude
+  end
+
+  def test_parse_coordinate_with_non_numeric_string_returns_nil
+    request = Object.new
+    env = {
+      'HTTP_CF_IPCOUNTRY' => 'US',
+      'HTTP_CF_IPCITY' => 'SF',
+      'HTTP_CF_IPLATITUDE' => 'abc',
+      'HTTP_CF_IPLONGITUDE' => 'xyz'
+    }
+    request.define_singleton_method(:env) { env }
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_nil result.latitude
+    assert_nil result.longitude
+  end
+
+  def test_parse_coordinate_with_nil_returns_nil
+    request = Object.new
+    env = {
+      'HTTP_CF_IPCOUNTRY' => 'US',
+      'HTTP_CF_IPCITY' => 'SF'
+      # HTTP_CF_IPLATITUDE and HTTP_CF_IPLONGITUDE not present (nil)
+    }
+    request.define_singleton_method(:env) { env }
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_nil result.latitude
+    assert_nil result.longitude
+  end
+
+  # === extract_header edge cases ===
+
+  def test_extract_header_present_returns_value
+    request = mock_cloudflare_request(country: 'US', city: 'SF', region: 'California')
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_equal 'California', result.region
+  end
+
+  def test_extract_header_absent_returns_nil
+    request = mock_cloudflare_request(country: 'US', city: 'SF')
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_nil result.region
+  end
+
+  def test_extract_header_empty_string_returns_nil
+    request = Object.new
+    env = {
+      'HTTP_CF_IPCOUNTRY' => 'US',
+      'HTTP_CF_IPCITY' => 'SF',
+      'HTTP_CF_REGION' => ''
+    }
+    request.define_singleton_method(:env) { env }
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_nil result.region
+  end
+
+  def test_xx_country_code_does_not_populate_new_fields
+    request = mock_request_with_xx_country
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_nil result.region
+    assert_nil result.region_code
+    assert_nil result.continent
+    assert_nil result.timezone
+    assert_nil result.latitude
+    assert_nil result.longitude
+    assert_nil result.postal_code
+    assert_nil result.metro_code
+  end
 end

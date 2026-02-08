@@ -16,6 +16,7 @@ Gem::Specification.new do |spec|
 
   spec.metadata["allowed_push_host"] = "https://rubygems.org"
 
+  spec.metadata["rubygems_mfa_required"] = "true"
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = "https://github.com/rameerez/trackdown"
   spec.metadata["changelog_uri"] = "https://github.com/rameerez/trackdown/blob/main/CHANGELOG.md"
@@ -43,16 +44,5 @@ Gem::Specification.new do |spec|
   #
   # For Cloudflare provider: No additional gems required!
 
-  spec.add_development_dependency "rake", "~> 13.0"
-  spec.add_development_dependency "rubocop", "~> 1.21"
-
-  # Testing dependencies
-  spec.add_development_dependency "minitest", "~> 5.25"
-  spec.add_development_dependency "mocha", "~> 2.0"
-  spec.add_development_dependency "simplecov", "~> 0.22"
-  spec.add_development_dependency "webmock", "~> 3.0"
-
-  # Optional dev dependencies for testing MaxMind provider
-  spec.add_development_dependency "maxmind-db", "~> 1.2"
-  spec.add_development_dependency "connection_pool", "~> 2.4"
+  # Development dependencies are managed in the Gemfile
 end

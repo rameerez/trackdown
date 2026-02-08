@@ -13,6 +13,14 @@ module Trackdown
     class CloudflareProvider < BaseProvider
       COUNTRY_HEADER = 'HTTP_CF_IPCOUNTRY'
       CITY_HEADER = 'HTTP_CF_IPCITY'
+      REGION_HEADER = 'HTTP_CF_REGION'
+      REGION_CODE_HEADER = 'HTTP_CF_REGION_CODE'
+      LATITUDE_HEADER = 'HTTP_CF_IPLATITUDE'
+      LONGITUDE_HEADER = 'HTTP_CF_IPLONGITUDE'
+      TIMEZONE_HEADER = 'HTTP_CF_TIMEZONE'
+      CONTINENT_HEADER = 'HTTP_CF_IPCONTINENT'
+      METRO_CODE_HEADER = 'HTTP_CF_METRO_CODE'
+      POSTAL_CODE_HEADER = 'HTTP_CF_POSTAL_CODE'
 
       # Special Cloudflare country codes
       UNKNOWN_CODE = 'XX'
@@ -43,7 +51,17 @@ module Trackdown
           city = extract_city(request)
           flag_emoji = get_emoji_flag(country_code)
 
-          LocationResult.new(country_code, country_name, city, flag_emoji)
+          LocationResult.new(
+            country_code, country_name, city, flag_emoji,
+            region: extract_header(request, REGION_HEADER),
+            region_code: extract_header(request, REGION_CODE_HEADER),
+            continent: extract_header(request, CONTINENT_HEADER),
+            timezone: extract_header(request, TIMEZONE_HEADER),
+            latitude: parse_coordinate(request.env[LATITUDE_HEADER]),
+            longitude: parse_coordinate(request.env[LONGITUDE_HEADER]),
+            postal_code: extract_header(request, POSTAL_CODE_HEADER),
+            metro_code: extract_header(request, METRO_CODE_HEADER)
+          )
         end
 
         private
@@ -63,6 +81,21 @@ module Trackdown
           return 'Unknown' if city.nil? || city.empty?
 
           city
+        end
+
+        def extract_header(request, header)
+          value = request.env[header]
+          return nil if value.nil? || value.empty?
+
+          value
+        end
+
+        def parse_coordinate(value)
+          return nil if value.nil? || value.empty?
+
+          Float(value)
+        rescue ArgumentError, TypeError
+          nil
         end
       end
     end
