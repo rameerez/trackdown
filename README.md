@@ -26,7 +26,7 @@ If your app is behind Cloudflare, you can use `trackdown` with **zero configurat
 - No external dependencies
 - Instant lookups from Cloudflare headers
 
-Just enable "IP Geolocation" in your Cloudflare dashboard and you're done! We automatically check for the Cloudflare headers in the context of a `request` and provide you with the IP geo data.
+Just enable "IP Geolocation" in your Cloudflare dashboard and you're done! For the full set of location fields (city, region, coordinates, etc.), enable ["Add visitor location headers"](https://developers.cloudflare.com/rules/transform/managed-transforms/reference/) in Managed Transforms. We automatically read these headers from the `request` and provide you with the IP geo data.
 
 ### Option 2: MaxMind (BYOK - Bring Your Own Key)
 
@@ -186,7 +186,7 @@ result.country_info    # => # Rich country data from the `countries` gem
 ```
 
 > [!NOTE]
-> The `region`, `region_code`, `continent`, `timezone`, `latitude`, `longitude`, `postal_code`, and `metro_code` fields require Cloudflare's "Add visitor location headers" Managed Transform to be enabled, or a MaxMind GeoLite2-City database. These fields return `nil` when not available.
+> The `region`, `region_code`, `continent`, `timezone`, `latitude`, `longitude`, `postal_code`, and `metro_code` fields require Cloudflare's ["Add visitor location headers"](https://developers.cloudflare.com/rules/transform/managed-transforms/reference/) Managed Transform to be enabled, or a MaxMind GeoLite2-City database. These fields return `nil` when not available.
 
 ### Rich country information
 
@@ -271,9 +271,22 @@ Trackdown.update_database
 
 ### Cloudflare Provider
 
-When you enable "IP Geolocation" in Cloudflare, they add the `CF-IPCountry` header to every request. If you enable "Add visitor location headers" (via Managed Transforms), you also get `CF-IPCity`, `CF-IPContinent`, `CF-IPLatitude`, `CF-IPLongitude`, `CF-Region`, `CF-Region-Code`, `CF-Metro-Code`, `CF-Postal-Code`, and `CF-Timezone`.
+When you enable "IP Geolocation" in Cloudflare, they add the `CF-IPCountry` header to every request. If you also enable ["Add visitor location headers"](https://developers.cloudflare.com/rules/transform/managed-transforms/reference/) (via Managed Transforms), you get all 10 location headers:
 
-Trackdown reads these headers directly from the request with zero overhead, and no database lookups.
+| Cloudflare header | `trackdown` field |
+|---|---|
+| `cf-ipcountry` | `country_code` |
+| `cf-ipcity` | `city` |
+| `cf-ipcontinent` | `continent` |
+| `cf-iplatitude` | `latitude` |
+| `cf-iplongitude` | `longitude` |
+| `cf-region` | `region` |
+| `cf-region-code` | `region_code` |
+| `cf-metro-code` | `metro_code` |
+| `cf-postal-code` | `postal_code` |
+| `cf-timezone` | `timezone` |
+
+Trackdown reads these headers directly from the request with zero overhead — no database lookups, no external API calls.
 
 ### MaxMind Provider
 
