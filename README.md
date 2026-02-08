@@ -12,6 +12,8 @@ Given an IP, it gives you the corresponding:
 - 🌍 Continent (e.g. "NA", "EU")
 - 🕐 Timezone (e.g. "America/Los_Angeles")
 - 📌 Latitude and longitude coordinates
+- 📮 Postal code (e.g. "94107")
+- 📺 Metro code (e.g. "807")
 - 🇺🇸 Emoji flag of the country
 
 ## Two ways to use `trackdown`
@@ -175,6 +177,8 @@ result.continent       # => 'NA'
 result.timezone        # => 'America/Los_Angeles'
 result.latitude        # => 37.7749
 result.longitude       # => -122.4194
+result.postal_code     # => '94107'
+result.metro_code      # => '807'
 result.flag_emoji      # => '🇺🇸'
 result.emoji           # => '🇺🇸' (alias for flag_emoji)
 result.country_flag    # => '🇺🇸' (alias for flag_emoji)
@@ -182,7 +186,7 @@ result.country_info    # => # Rich country data from the `countries` gem
 ```
 
 > [!NOTE]
-> The `region`, `region_code`, `continent`, `timezone`, `latitude`, and `longitude` fields require Cloudflare's "Add visitor location headers" Managed Transform to be enabled, or a MaxMind GeoLite2-City database. These fields return `nil` when not available.
+> The `region`, `region_code`, `continent`, `timezone`, `latitude`, `longitude`, `postal_code`, and `metro_code` fields require Cloudflare's "Add visitor location headers" Managed Transform to be enabled, or a MaxMind GeoLite2-City database. These fields return `nil` when not available.
 
 ### Rich country information
 
@@ -213,6 +217,8 @@ result.to_h
 #      timezone: 'America/Los_Angeles',
 #      latitude: 37.7749,
 #      longitude: -122.4194,
+#      postal_code: '94107',
+#      metro_code: '807',
 #      country_info: { ... }
 #    }
 ```
@@ -265,7 +271,7 @@ Trackdown.update_database
 
 ### Cloudflare Provider
 
-When you enable "IP Geolocation" in Cloudflare, they add the `CF-IPCountry` header to every request. If you enable "Add visitor location headers" (via Managed Transforms), you also get `CF-IPCity`, `CF-Region`, `CF-Region-Code`, `CF-Latitude`, `CF-Longitude`, `CF-Timezone`, and `CF-Continent`.
+When you enable "IP Geolocation" in Cloudflare, they add the `CF-IPCountry` header to every request. If you enable "Add visitor location headers" (via Managed Transforms), you also get `CF-IPCity`, `CF-IPContinent`, `CF-IPLatitude`, `CF-IPLongitude`, `CF-Region`, `CF-Region-Code`, `CF-Metro-Code`, `CF-Postal-Code`, and `CF-Timezone`.
 
 Trackdown reads these headers directly from the request with zero overhead, and no database lookups.
 

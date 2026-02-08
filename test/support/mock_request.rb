@@ -5,7 +5,8 @@ module TestHelpers
     def mock_cloudflare_request(country: 'US', city: 'San Francisco',
                                 region: nil, region_code: nil,
                                 latitude: nil, longitude: nil,
-                                timezone: nil, continent: nil)
+                                timezone: nil, continent: nil,
+                                postal_code: nil, metro_code: nil)
       request = Object.new
       env = {
         'HTTP_CF_IPCOUNTRY' => country,
@@ -13,10 +14,12 @@ module TestHelpers
       }
       env['HTTP_CF_REGION'] = region if region
       env['HTTP_CF_REGION_CODE'] = region_code if region_code
-      env['HTTP_CF_LATITUDE'] = latitude if latitude
-      env['HTTP_CF_LONGITUDE'] = longitude if longitude
+      env['HTTP_CF_IPLATITUDE'] = latitude if latitude
+      env['HTTP_CF_IPLONGITUDE'] = longitude if longitude
       env['HTTP_CF_TIMEZONE'] = timezone if timezone
-      env['HTTP_CF_CONTINENT'] = continent if continent
+      env['HTTP_CF_IPCONTINENT'] = continent if continent
+      env['HTTP_CF_POSTAL_CODE'] = postal_code if postal_code
+      env['HTTP_CF_METRO_CODE'] = metro_code if metro_code
       request.define_singleton_method(:env) { env }
       request
     end
@@ -30,7 +33,9 @@ module TestHelpers
         latitude: '37.7749',
         longitude: '-122.4194',
         timezone: 'America/Los_Angeles',
-        continent: 'NA'
+        continent: 'NA',
+        postal_code: '94107',
+        metro_code: '807'
       )
     end
 

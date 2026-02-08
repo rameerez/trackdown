@@ -15,10 +15,12 @@ module Trackdown
       CITY_HEADER = 'HTTP_CF_IPCITY'
       REGION_HEADER = 'HTTP_CF_REGION'
       REGION_CODE_HEADER = 'HTTP_CF_REGION_CODE'
-      LATITUDE_HEADER = 'HTTP_CF_LATITUDE'
-      LONGITUDE_HEADER = 'HTTP_CF_LONGITUDE'
+      LATITUDE_HEADER = 'HTTP_CF_IPLATITUDE'
+      LONGITUDE_HEADER = 'HTTP_CF_IPLONGITUDE'
       TIMEZONE_HEADER = 'HTTP_CF_TIMEZONE'
-      CONTINENT_HEADER = 'HTTP_CF_CONTINENT'
+      CONTINENT_HEADER = 'HTTP_CF_IPCONTINENT'
+      METRO_CODE_HEADER = 'HTTP_CF_METRO_CODE'
+      POSTAL_CODE_HEADER = 'HTTP_CF_POSTAL_CODE'
 
       # Special Cloudflare country codes
       UNKNOWN_CODE = 'XX'
@@ -56,7 +58,9 @@ module Trackdown
             continent: extract_header(request, CONTINENT_HEADER),
             timezone: extract_header(request, TIMEZONE_HEADER),
             latitude: parse_coordinate(request.env[LATITUDE_HEADER]),
-            longitude: parse_coordinate(request.env[LONGITUDE_HEADER])
+            longitude: parse_coordinate(request.env[LONGITUDE_HEADER]),
+            postal_code: extract_header(request, POSTAL_CODE_HEADER),
+            metro_code: extract_header(request, METRO_CODE_HEADER)
           )
         end
 
