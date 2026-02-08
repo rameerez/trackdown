@@ -55,7 +55,9 @@ module Trackdown
             continent: record&.dig('continent', 'code'),
             timezone: record&.dig('location', 'time_zone'),
             latitude: record&.dig('location', 'latitude'),
-            longitude: record&.dig('location', 'longitude')
+            longitude: record&.dig('location', 'longitude'),
+            postal_code: record&.dig('postal', 'code'),
+            metro_code: record&.dig('location', 'metro_code')&.to_s
           )
         end
 

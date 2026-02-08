@@ -81,7 +81,11 @@ module TestHelpers
         'location' => {
           'latitude' => 37.7749,
           'longitude' => -122.4194,
-          'time_zone' => 'America/Los_Angeles'
+          'time_zone' => 'America/Los_Angeles',
+          'metro_code' => 807
+        },
+        'postal' => {
+          'code' => '94107'
         }
       }
     end

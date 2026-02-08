@@ -469,6 +469,8 @@ class MaxmindProviderTest < Minitest::Test
         assert_nil result.timezone
         assert_nil result.latitude
         assert_nil result.longitude
+        assert_nil result.postal_code
+        assert_nil result.metro_code
       end
     end
   end
@@ -489,6 +491,8 @@ class MaxmindProviderTest < Minitest::Test
         assert_equal 'America/Los_Angeles', result.timezone
         assert_in_delta 37.7749, result.latitude
         assert_in_delta(-122.4194, result.longitude)
+        assert_equal '94107', result.postal_code
+        assert_equal '807', result.metro_code
       end
     end
   end
@@ -520,6 +524,87 @@ class MaxmindProviderTest < Minitest::Test
         assert_nil result.timezone
         # latitude and longitude should still be present
         assert_in_delta 37.7749, result.latitude
+      end
+    end
+  end
+
+  # === postal_code and metro_code ===
+
+  def test_locate_extracts_postal_code_present
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, full_maxmind_record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_equal '94107', result.postal_code
+      end
+    end
+  end
+
+  def test_locate_extracts_metro_code_present
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, full_maxmind_record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_equal '807', result.metro_code
+      end
+    end
+  end
+
+  def test_locate_postal_code_absent
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+    record = full_maxmind_record
+    record.delete('postal')
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_nil result.postal_code
+      end
+    end
+  end
+
+  def test_locate_metro_code_absent
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+    record = full_maxmind_record
+    record['location'].delete('metro_code')
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_nil result.metro_code
+      end
+    end
+  end
+
+  def test_locate_metro_code_converts_integer_to_string
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+    record = full_maxmind_record
+    record['location']['metro_code'] = 501
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_equal '501', result.metro_code
+      end
+    end
+  end
+
+  def test_locate_nil_record_has_nil_postal_and_metro
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+
+    File.stub :exist?, true do
+      Trackdown::Providers::MaxmindProvider.stub :fetch_record, nil do
+        result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+
+        assert_nil result.postal_code
+        assert_nil result.metro_code
       end
     end
   end
