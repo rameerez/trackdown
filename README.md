@@ -1,5 +1,7 @@
 # 📍 `trackdown` - Ruby gem to geolocate IPs
 
+[![Gem Version](https://badge.fury.io/rb/trackdown.svg)](https://badge.fury.io/rb/trackdown) [![Build Status](https://github.com/rameerez/trackdown/workflows/Tests/badge.svg)](https://github.com/rameerez/trackdown/actions)
+
 > [!TIP]
 > **🚀 Ship your next Rails app 10x faster!** I've built **[RailsFast](https://railsfast.com/?ref=trackdown)**, a production-ready Rails boilerplate template that comes with everything you need to launch a software business in days, not weeks. Go [check it out](https://railsfast.com/?ref=trackdown)!
 
@@ -132,7 +134,7 @@ production:
   refresh_trackdown_database:
     class: TrackdownDatabaseRefreshJob
     queue: default
-    schedule: every Saturday at 4am US/Pacific
+    schedule: every Saturday at 4am
 ```
 
 > [!NOTE]
