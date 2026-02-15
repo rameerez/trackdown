@@ -299,6 +299,74 @@ Trackdown reads these headers directly from the request with zero overhead — n
 Downloads the [GeoLite2-City](https://dev.maxmind.com/geoip/docs/databases/city-and-country/) database to your server and performs local lookups using connection pooling for performance. All fields (`country`, `city`, `region`, `continent`, `timezone`, `latitude`, `longitude`, `postal_code`, `metro_code`) are extracted from the database record.
 
 
+## Docker & Container Deployments
+
+When deploying with Docker, Kubernetes, or similar container orchestration, the MaxMind database file needs special handling since container filesystems are ephemeral.
+
+### Option 1: Persistent Volume (Recommended)
+
+Mount a persistent volume for the database file so it survives container restarts and deployments.
+
+**Kamal (`config/deploy.yml`):**
+```yaml
+volumes:
+  - "trackdown_data:/rails/db/geodata"
+```
+
+Then configure the database path:
+```ruby
+# config/initializers/trackdown.rb
+config.database_path = Rails.root.join('db', 'geodata', 'GeoLite2-City.mmdb').to_s
+```
+
+**Docker Compose:**
+```yaml
+services:
+  app:
+    volumes:
+      - trackdown_data:/rails/db/geodata
+
+volumes:
+  trackdown_data:
+```
+
+### Option 2: Download on Container Start
+
+If you prefer not to use volumes, download the database when the container starts. Add to your entrypoint or a post-deploy hook:
+
+```bash
+# In your entrypoint.sh or deploy hook
+bin/rails runner "Trackdown.update_database unless File.exist?(Trackdown.configuration.database_path)"
+```
+
+Or create a job that runs on boot:
+
+```ruby
+# config/initializers/trackdown_boot.rb
+Rails.application.config.after_initialize do
+  if Rails.env.production? && !File.exist?(Trackdown.configuration.database_path)
+    Trackdown.update_database
+  end
+end
+```
+
+> [!WARNING]
+> Option 2 adds startup time (~10-30 seconds) on fresh deploys and requires network access during boot. A persistent volume is more reliable for production.
+
+### Background Jobs Consideration
+
+When using background job processors (Sidekiq, SolidQueue, GoodJob), geolocation lookups in jobs **cannot use Cloudflare headers** since there's no HTTP request. These jobs will fall back to MaxMind automatically when using `:auto` provider.
+
+Make sure MaxMind is properly configured if you're doing geolocation in background jobs:
+
+```ruby
+# This works in controllers (has request)
+Trackdown.locate(ip, request: request)  # Uses Cloudflare if available
+
+# This works in background jobs (no request)
+Trackdown.locate(ip)  # Falls back to MaxMind
+```
+
 ## Development
 
 After checking out the repo, run `bundle install` to install dependencies. Then, run `bundle exec rake test` to run the Minitest tests.
