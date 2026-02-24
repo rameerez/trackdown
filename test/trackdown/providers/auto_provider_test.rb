@@ -126,4 +126,114 @@ class AutoProviderTest < Minitest::Test
       assert_equal 'US', result.country_code
     end
   end
+
+  # --- IP Mismatch Detection Tests ---
+  # When there's an upstream proxy before Cloudflare, CF-Connecting-IP will contain
+  # the proxy's IP, not the real client. The geo headers will be wrong.
+
+  def test_uses_cloudflare_when_cf_connecting_ip_matches
+    # CF-Connecting-IP matches the IP we're looking up - Cloudflare headers are valid
+    client_ip = '104.255.87.245'
+    request = mock_cloudflare_request_with_matching_ip(ip: client_ip, country: 'GB', city: 'London')
+    cf_result = Trackdown::LocationResult.new('GB', 'United Kingdom', 'London', '🇬🇧')
+
+    Trackdown::Providers::CloudflareProvider.expects(:available?).with(request: request).returns(true)
+    Trackdown::Providers::CloudflareProvider.expects(:locate).with(client_ip, request: request).returns(cf_result)
+    Trackdown::Providers::MaxmindProvider.expects(:locate).never
+
+    result = Trackdown::Providers::AutoProvider.locate(client_ip, request: request)
+
+    assert_equal 'GB', result.country_code
+    assert_equal 'London', result.city
+  end
+
+  def test_uses_cloudflare_when_ipv6_formats_are_equivalent
+    # Same IPv6 address represented with different formatting.
+    client_ip = '2001:0db8:0000:0000:0000:0000:0000:0001'
+    request = Object.new
+    env = {
+      'HTTP_CF_IPCOUNTRY' => 'DE',
+      'HTTP_CF_IPCITY' => 'Berlin',
+      'HTTP_CF_CONNECTING_IP' => '2001:db8::1'
+    }
+    request.define_singleton_method(:env) { env }
+    cf_result = Trackdown::LocationResult.new('DE', 'Germany', 'Berlin', '🇩🇪')
+
+    Trackdown::Providers::CloudflareProvider.expects(:available?).with(request: request).returns(true)
+    Trackdown::Providers::CloudflareProvider.expects(:locate).with(client_ip, request: request).returns(cf_result)
+    Trackdown::Providers::MaxmindProvider.expects(:locate).never
+
+    result = Trackdown::Providers::AutoProvider.locate(client_ip, request: request)
+
+    assert_equal 'DE', result.country_code
+    assert_equal 'Berlin', result.city
+  end
+
+  def test_uses_cloudflare_when_ipv4_mapped_ipv6_matches
+    # Cloudflare may emit IPv4-mapped IPv6 in some network paths.
+    client_ip = '203.0.113.9'
+    request = Object.new
+    env = {
+      'HTTP_CF_IPCOUNTRY' => 'US',
+      'HTTP_CF_IPCITY' => 'Denver',
+      'HTTP_CF_CONNECTING_IP' => '::ffff:203.0.113.9'
+    }
+    request.define_singleton_method(:env) { env }
+    cf_result = Trackdown::LocationResult.new('US', 'United States', 'Denver', '🇺🇸')
+
+    Trackdown::Providers::CloudflareProvider.expects(:available?).with(request: request).returns(true)
+    Trackdown::Providers::CloudflareProvider.expects(:locate).with(client_ip, request: request).returns(cf_result)
+    Trackdown::Providers::MaxmindProvider.expects(:locate).never
+
+    result = Trackdown::Providers::AutoProvider.locate(client_ip, request: request)
+
+    assert_equal 'US', result.country_code
+    assert_equal 'Denver', result.city
+  end
+
+  def test_falls_back_to_maxmind_when_cf_connecting_ip_differs
+    # Simulates an upstream proxy before Cloudflare (e.g., rameerezapi)
+    # The real client is in India, but CF-Connecting-IP shows the proxy in Ashburn
+    client_ip = '104.255.87.245'  # Real client IP
+    proxy_ip = '34.204.24.48'     # Proxy's IP that Cloudflare saw (in Ashburn)
+
+    request = mock_cloudflare_request_with_proxy(
+      proxy_ip: proxy_ip,
+      proxy_country: 'US',
+      proxy_city: 'Ashburn'
+    )
+
+    # MaxMind should geolocate the real client IP correctly
+    maxmind_result = Trackdown::LocationResult.new('IN', 'India', 'Mumbai', '🇮🇳')
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+
+    File.stub :exist?, true do
+      Trackdown::Providers::CloudflareProvider.expects(:available?).with(request: request).returns(true)
+      # Cloudflare locate should NOT be called because IPs don't match
+      Trackdown::Providers::CloudflareProvider.expects(:locate).never
+      Trackdown::Providers::MaxmindProvider.expects(:available?).with(request: request).returns(true)
+      Trackdown::Providers::MaxmindProvider.expects(:locate).with(client_ip, request: request).returns(maxmind_result)
+
+      result = Trackdown::Providers::AutoProvider.locate(client_ip, request: request)
+
+      # Should return the correct location from MaxMind, not Ashburn from Cloudflare
+      assert_equal 'IN', result.country_code
+      assert_equal 'Mumbai', result.city
+    end
+  end
+
+  def test_uses_cloudflare_when_no_cf_connecting_ip_header
+    # If CF-Connecting-IP is not present, assume Cloudflare headers are valid
+    # (this is the legacy behavior for apps that don't have this header)
+    request = mock_cloudflare_request(country: 'DE', city: 'Berlin')
+    cf_result = Trackdown::LocationResult.new('DE', 'Germany', 'Berlin', '🇩🇪')
+
+    Trackdown::Providers::CloudflareProvider.expects(:available?).with(request: request).returns(true)
+    Trackdown::Providers::CloudflareProvider.expects(:locate).with('8.8.8.8', request: request).returns(cf_result)
+    Trackdown::Providers::MaxmindProvider.expects(:locate).never
+
+    result = Trackdown::Providers::AutoProvider.locate('8.8.8.8', request: request)
+
+    assert_equal 'DE', result.country_code
+  end
 end

@@ -1,3 +1,10 @@
+## [0.3.1] - 2026-02-24
+
+- Fix incorrect Cloudflare geolocation when an upstream proxy sits before Cloudflare
+- In `:auto` mode, compare `CF-Connecting-IP` with the target IP and fall back to MaxMind on mismatch
+- Normalize compared IPs with `IPAddr` so equivalent IPv6 / IPv4-mapped forms are treated as matches
+- Add tests covering matching and mismatching `CF-Connecting-IP` scenarios
+
 ## [0.3.0] - 2026-02-08
 
 - Add 8 new geolocation fields: `region`, `region_code`, `continent`, `timezone`, `latitude`, `longitude`, `postal_code`, `metro_code`
