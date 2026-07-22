@@ -15,13 +15,14 @@ module Trackdown
                   :reject_private_ips
 
     # Available provider types:
-    # :auto - Try Cloudflare first, fall back to MaxMind (recommended)
+    # :auto - Try header providers (Cloudflare, CloudFront) first, fall back to MaxMind (recommended)
     # :cloudflare - Only use Cloudflare headers
+    # :cloudfront - Only use Amazon CloudFront headers
     # :maxmind - Only use MaxMind database
-    VALID_PROVIDERS = [:auto, :cloudflare, :maxmind].freeze
+    VALID_PROVIDERS = [:auto, :cloudflare, :cloudfront, :maxmind].freeze
 
     def initialize
-      @provider = :auto # Intelligent default: try Cloudflare first, fall back to MaxMind
+      @provider = :auto # Intelligent default: try edge headers first, fall back to MaxMind
       @maxmind_license_key = nil
       @maxmind_account_id = nil
       @database_path = defined?(Rails) ? Rails.root.join('db', 'GeoLite2-City.mmdb').to_s : 'db/GeoLite2-City.mmdb'

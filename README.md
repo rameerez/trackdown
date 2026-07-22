@@ -7,7 +7,7 @@
 
 `trackdown` is a Ruby gem that allows you to geolocate IP addresses easily.
 
-It works out-of-the-box with **Cloudflare** (zero config!); and it's also a simple, convenient wrapper on top of **MaxMind** (just bring your own MaxMind key, and you're good to go!).
+It works out-of-the-box with **Cloudflare** and **Amazon CloudFront** (zero config!); and it's also a simple, convenient wrapper on top of **MaxMind** (just bring your own MaxMind key, and you're good to go!).
 
 `trackdown` offers a clean API for Rails applications to fetch country, city, region, continent, timezone, coordinates, and emoji flag information for any IP address.
 
@@ -34,20 +34,30 @@ If your Rails app is behind Cloudflare, you can use `trackdown` with **zero conf
 
 Just enable "IP Geolocation" in your Cloudflare dashboard and you're done! For the full set of location fields (city, region, coordinates, etc.), enable ["Add visitor location headers"](https://developers.cloudflare.com/rules/transform/managed-transforms/reference/) in Managed Transforms. We automatically read these headers from the `request` and provide you with the IP geo data.
 
-### Option 2: MaxMind (BYOK - Bring Your Own Key)
+### Option 2: Amazon CloudFront (recommended, zero config)
 
-For apps not behind Cloudflare, offline apps, non-Rails apps, or as a fallback, use MaxMind:
+If your Rails app is behind Amazon CloudFront (the AWS CDN), you can use `trackdown` with **zero configuration**, just like Cloudflare:
+- No API keys needed
+- No database downloads
+- No external dependencies
+- Instant lookups from CloudFront `CloudFront-Viewer-*` headers
+
+Attach an [origin request policy](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/controlling-origin-requests.html) that forwards the CloudFront geolocation headers to your origin — the AWS **managed policy `AllViewerAndCloudFrontHeaders-2022-06`** already includes all of them. We automatically read these headers from the `request`. (Note: CloudFront does not emit a continent header, so `continent` is derived from the country code.)
+
+### Option 3: MaxMind (BYOK - Bring Your Own Key)
+
+For apps not behind a supported CDN, offline apps, non-Rails apps, or as a fallback, use MaxMind:
 - Requires MaxMind account and license key
 - Requires downloading and maintaining a local database
 - Works offline once database is downloaded
 - Get started at [MaxMind](https://www.maxmind.com/)
 
-### Option 3: Auto
+### Option 4: Auto
 
-By default, `trackdown` uses **`:auto` mode** which tries Cloudflare first and falls back to MaxMind automatically.
+By default, `trackdown` uses **`:auto` mode** which tries edge headers first (Cloudflare, then CloudFront) and falls back to MaxMind automatically.
 
 > [!NOTE]
-> Trackdown fails gracefully. If no provider is available (no Cloudflare headers, no MaxMind database), it returns `'Unknown'` instead of raising an error, so your app doesn't crash due to a missing geolocation provider.
+> Trackdown fails gracefully. If no provider is available (no Cloudflare/CloudFront headers, no MaxMind database), it returns `'Unknown'` instead of raising an error, so your app doesn't crash due to a missing geolocation provider.
 
 
 ## Installation
@@ -235,8 +245,9 @@ result.to_h
 
 ```ruby
 Trackdown.configure do |config|
-  # :auto - Try Cloudflare first, fall back to MaxMind (default, recommended)
+  # :auto - Try edge headers first (Cloudflare, then CloudFront), fall back to MaxMind (default, recommended)
   # :cloudflare - Only use Cloudflare headers
+  # :cloudfront - Only use Amazon CloudFront headers
   # :maxmind - Only use MaxMind database
   config.provider = :auto
 end
@@ -293,6 +304,24 @@ When you enable "IP Geolocation" in Cloudflare, they add the `CF-IPCountry` head
 | `cf-timezone` | `timezone` |
 
 Trackdown reads these headers directly from the request with zero overhead — no database lookups, no external API calls.
+
+### CloudFront Provider
+
+When your app is behind Amazon CloudFront and the origin request policy forwards the CloudFront geolocation headers (the managed `AllViewerAndCloudFrontHeaders-2022-06` policy includes them all), CloudFront adds `CloudFront-Viewer-*` headers to every origin request:
+
+| CloudFront header | `trackdown` field |
+|---|---|
+| `CloudFront-Viewer-Country` | `country_code` |
+| `CloudFront-Viewer-City` | `city` |
+| `CloudFront-Viewer-Country-Region-Name` | `region` |
+| `CloudFront-Viewer-Country-Region` | `region_code` |
+| `CloudFront-Viewer-Latitude` | `latitude` |
+| `CloudFront-Viewer-Longitude` | `longitude` |
+| `CloudFront-Viewer-Metro-Code` | `metro_code` |
+| `CloudFront-Viewer-Postal-Code` | `postal_code` |
+| `CloudFront-Viewer-Time-Zone` | `timezone` |
+
+Like the Cloudflare provider, this reads headers directly from the request with zero overhead. CloudFront does not provide a continent header, so `continent` is derived from the country code and normalized to the same 2-letter code (`NA`, `EU`, …) the other providers return. In `:auto` mode, if an upstream proxy sits before CloudFront (detected by comparing `CloudFront-Viewer-Address` with the target IP), trackdown falls back to MaxMind.
 
 ### MaxMind Provider
 

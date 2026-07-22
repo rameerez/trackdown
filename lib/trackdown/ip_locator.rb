@@ -4,6 +4,7 @@ require_relative 'location_result'
 require_relative 'ip_validator'
 require_relative 'providers/auto_provider'
 require_relative 'providers/cloudflare_provider'
+require_relative 'providers/cloudfront_provider'
 require_relative 'providers/maxmind_provider'
 
 module Trackdown
@@ -32,6 +33,8 @@ module Trackdown
           Providers::AutoProvider
         when :cloudflare
           Providers::CloudflareProvider
+        when :cloudfront
+          Providers::CloudfrontProvider
         when :maxmind
           Providers::MaxmindProvider
         else

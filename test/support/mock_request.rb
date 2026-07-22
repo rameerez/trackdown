@@ -45,6 +45,52 @@ module TestHelpers
       request
     end
 
+    def mock_cloudfront_request(country: 'US', city: 'San Francisco',
+                                region: nil, region_code: nil,
+                                latitude: nil, longitude: nil,
+                                timezone: nil, postal_code: nil,
+                                metro_code: nil, viewer_address: nil)
+      request = Object.new
+      env = {}
+      env['HTTP_CLOUDFRONT_VIEWER_COUNTRY'] = country unless country.nil?
+      env['HTTP_CLOUDFRONT_VIEWER_CITY'] = city unless city.nil?
+      env['HTTP_CLOUDFRONT_VIEWER_COUNTRY_REGION_NAME'] = region if region
+      env['HTTP_CLOUDFRONT_VIEWER_COUNTRY_REGION'] = region_code if region_code
+      env['HTTP_CLOUDFRONT_VIEWER_LATITUDE'] = latitude if latitude
+      env['HTTP_CLOUDFRONT_VIEWER_LONGITUDE'] = longitude if longitude
+      env['HTTP_CLOUDFRONT_VIEWER_TIME_ZONE'] = timezone if timezone
+      env['HTTP_CLOUDFRONT_VIEWER_POSTAL_CODE'] = postal_code if postal_code
+      env['HTTP_CLOUDFRONT_VIEWER_METRO_CODE'] = metro_code if metro_code
+      env['HTTP_CLOUDFRONT_VIEWER_ADDRESS'] = viewer_address if viewer_address
+      request.define_singleton_method(:env) { env }
+      request
+    end
+
+    def mock_cloudfront_request_with_all_headers
+      mock_cloudfront_request(
+        country: 'US',
+        city: 'San Francisco',
+        region: 'California',
+        region_code: 'CA',
+        latitude: '37.7749',
+        longitude: '-122.4194',
+        timezone: 'America/Los_Angeles',
+        postal_code: '94107',
+        metro_code: '807'
+      )
+    end
+
+    # Mock a CloudFront request where Viewer-Address (IP:port) matches the client IP
+    def mock_cloudfront_request_with_matching_ip(ip:, port: '46532', country: 'US', city: 'San Francisco')
+      mock_cloudfront_request(country: country, city: city, viewer_address: "#{ip}:#{port}")
+    end
+
+    # Mock a CloudFront request where Viewer-Address differs from the IP we're geolocating
+    # (simulates an upstream proxy before CloudFront)
+    def mock_cloudfront_request_with_proxy(proxy_ip:, port: '46532', proxy_country: 'US', proxy_city: 'Ashburn')
+      mock_cloudfront_request(country: proxy_country, city: proxy_city, viewer_address: "#{proxy_ip}:#{port}")
+    end
+
     def mock_request_with_xx_country
       request = Object.new
       env = { 'HTTP_CF_IPCOUNTRY' => 'XX' }

@@ -9,6 +9,7 @@ require_relative "trackdown/database_updater"
 require_relative "trackdown/location_result"
 require_relative "trackdown/providers/base_provider"
 require_relative "trackdown/providers/cloudflare_provider"
+require_relative "trackdown/providers/cloudfront_provider"
 require_relative "trackdown/providers/maxmind_provider"
 require_relative "trackdown/providers/auto_provider"
 

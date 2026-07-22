@@ -236,4 +236,66 @@ class AutoProviderTest < Minitest::Test
 
     assert_equal 'DE', result.country_code
   end
+
+  # --- CloudFront edge-header integration ---
+
+  def test_available_true_with_cloudfront_headers
+    request = mock_cloudfront_request(country: 'US')
+    assert Trackdown::Providers::AutoProvider.available?(request: request)
+  end
+
+  def test_uses_cloudfront_when_cloudflare_absent
+    request = mock_cloudfront_request(country: 'CA', city: 'Toronto')
+    result = Trackdown::Providers::AutoProvider.locate('8.8.8.8', request: request)
+
+    assert_equal 'CA', result.country_code
+    assert_equal 'Toronto', result.city
+  end
+
+  def test_uses_cloudfront_when_viewer_address_matches
+    client_ip = '203.0.113.9'
+    request = mock_cloudfront_request_with_matching_ip(ip: client_ip, country: 'US', city: 'Denver')
+    result = Trackdown::Providers::AutoProvider.locate(client_ip, request: request)
+
+    assert_equal 'US', result.country_code
+    assert_equal 'Denver', result.city
+  end
+
+  def test_cloudflare_takes_precedence_over_cloudfront
+    # A request carrying both CDNs' headers should resolve via Cloudflare (higher priority)
+    request = Object.new
+    env = {
+      'HTTP_CF_IPCOUNTRY' => 'GB', 'HTTP_CF_IPCITY' => 'London',
+      'HTTP_CLOUDFRONT_VIEWER_COUNTRY' => 'US', 'HTTP_CLOUDFRONT_VIEWER_CITY' => 'New York'
+    }
+    request.define_singleton_method(:env) { env }
+
+    result = Trackdown::Providers::AutoProvider.locate('8.8.8.8', request: request)
+
+    assert_equal 'GB', result.country_code
+    assert_equal 'London', result.city
+  end
+
+  def test_falls_back_to_maxmind_when_cloudfront_viewer_address_differs
+    # Simulates an upstream proxy before CloudFront: Viewer-Address shows the proxy,
+    # not the real client, so CloudFront's geo would be wrong.
+    client_ip = '104.255.87.245'
+    proxy_ip = '34.204.24.48'
+    request = mock_cloudfront_request_with_proxy(proxy_ip: proxy_ip, proxy_country: 'US', proxy_city: 'Ashburn')
+
+    maxmind_result = Trackdown::LocationResult.new('IN', 'India', 'Mumbai', '🇮🇳')
+    Trackdown.configuration.database_path = '/fake/path.mmdb'
+
+    File.stub :exist?, true do
+      # CloudFront locate must NOT be called because the IPs don't match
+      Trackdown::Providers::CloudfrontProvider.expects(:locate).never
+      Trackdown::Providers::MaxmindProvider.expects(:available?).with(request: request).returns(true)
+      Trackdown::Providers::MaxmindProvider.expects(:locate).with(client_ip, request: request).returns(maxmind_result)
+
+      result = Trackdown::Providers::AutoProvider.locate(client_ip, request: request)
+
+      assert_equal 'IN', result.country_code
+      assert_equal 'Mumbai', result.city
+    end
+  end
 end

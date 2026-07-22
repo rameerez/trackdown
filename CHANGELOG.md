@@ -1,3 +1,10 @@
+## [Unreleased]
+
+- Add **Amazon CloudFront** provider (`:cloudfront`): zero-config IP geolocation from `CloudFront-Viewer-*` headers when your app is behind the AWS CDN, mirroring the Cloudflare provider
+- Reads country, city, region (name + code), timezone, latitude, longitude, postal code, and metro code; CloudFront emits no continent header, so `continent` is derived from the country code and normalized to the same 2-letter code (`NA`, `EU`, …) the other providers return
+- `:auto` mode now tries Cloudflare, then CloudFront, then MaxMind, and detects an upstream proxy before CloudFront by comparing `CloudFront-Viewer-Address` with the target IP (falling back to MaxMind on mismatch)
+- No new runtime dependencies; the provider requires the AWS managed `AllViewerAndCloudFrontHeaders-2022-06` origin request policy (or any policy forwarding the geolocation headers)
+
 ## [0.3.1] - 2026-02-24
 
 - Fix incorrect Cloudflare geolocation when an upstream proxy sits before Cloudflare
