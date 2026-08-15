@@ -40,6 +40,16 @@ module Trackdown
       @warn_mutex = Mutex.new
 
       class << self
+        # :auto has no identity of its own. Every result names whichever provider
+        # actually won, and a result with no provider at all names none.
+        def provider_name
+          nil
+        end
+
+        def provider_source
+          nil
+        end
+
         # Auto provider is available if at least one provider is available
         def available?(request: nil)
           cloudflare_auto_available?(request) ||
@@ -60,7 +70,7 @@ module Trackdown
 
           # No providers available - fail gracefully with a warning
           warn_no_providers
-          LocationResult.new(nil, 'Unknown', 'Unknown', '🏳️')
+          LocationResult.unavailable(:no_provider_available)
         end
 
         private

@@ -26,11 +26,20 @@ module Trackdown
       METRO_CODE_HEADER = 'HTTP_CF_METRO_CODE'
       POSTAL_CODE_HEADER = 'HTTP_CF_POSTAL_CODE'
 
-      # Special Cloudflare country codes
+      # Special Cloudflare country codes. Neither one names a country, so a
+      # result carrying one reports :provider_returned_unknown_country.
       UNKNOWN_CODE = 'XX'
       TOR_CODE = 'T1'
 
       class << self
+        def provider_name
+          :cloudflare
+        end
+
+        def provider_source
+          :cloudflare_request_headers
+        end
+
         # Check if Cloudflare headers are available in the request
         def available?(request: nil)
           return false unless request
@@ -46,10 +55,13 @@ module Trackdown
         def locate(_ip, request: nil)
           raise Trackdown::Error, "CloudflareProvider requires a request object with Cloudflare headers" unless request
 
+          provenance = request_provenance(request)
           country_code = extract_country_code(request)
 
           # If no valid country code, return unknown
-          return LocationResult.new(nil, 'Unknown', 'Unknown', '🏳️') if country_code.nil? || country_code == UNKNOWN_CODE
+          if country_code.nil? || country_code == UNKNOWN_CODE
+            return LocationResult.unavailable(:provider_returned_unknown_country, **provenance)
+          end
 
           country_name = get_country_name(country_code)
           city = extract_city(request)
@@ -64,7 +76,15 @@ module Trackdown
             latitude: parse_coordinate(request.env[LATITUDE_HEADER]),
             longitude: parse_coordinate(request.env[LONGITUDE_HEADER]),
             postal_code: extract_header(request, POSTAL_CODE_HEADER),
-            metro_code: extract_header(request, METRO_CODE_HEADER)
+            metro_code: extract_header(request, METRO_CODE_HEADER),
+            # "T1" says the visitor came through Tor, which is precisely a country
+            # Cloudflare could not determine. The code is kept, the claim is not.
+            # Only Cloudflare's own two pseudo-codes are treated this way: a code
+            # we simply haven't heard of (Kosovo's user-assigned "XK", say) is a
+            # real answer, not an unresolved one.
+            # https://developers.cloudflare.com/fundamentals/reference/http-headers/#cf-ipcountry
+            unavailable_reason: (:provider_returned_unknown_country if country_code == TOR_CODE),
+            **provenance
           )
         end
 

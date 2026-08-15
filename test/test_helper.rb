@@ -23,14 +23,19 @@ Dir[File.expand_path("support/**/*.rb", __dir__)].each { |f| require f }
 # Helper methods for all tests
 class Minitest::Test
   include TestHelpers::MockRequest if defined?(TestHelpers::MockRequest)
+  include TestHelpers::MaxmindStubs if defined?(TestHelpers::MaxmindStubs)
+  include TestHelpers::ProviderState if defined?(TestHelpers::ProviderState)
 
   def setup
     # Reset configuration before each test
     Trackdown.instance_variable_set(:@configuration, nil)
+    # Forget any database a previous test pretended to open
+    Trackdown::Providers::MaxmindProvider.reset_database!
   end
 
   def teardown
     # Clean up after each test
     Trackdown.instance_variable_set(:@configuration, nil)
+    Trackdown::Providers::MaxmindProvider.reset_database!
   end
 end

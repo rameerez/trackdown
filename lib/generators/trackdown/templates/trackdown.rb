@@ -97,6 +97,32 @@ Trackdown.configure do |config|
   # config.memory_mode = MaxMind::DB::MODE_MEMORY # or MODE_FILE to reduce memory
 
   # ========================================
+  # Trusted CDN Path Verification (optional)
+  # ========================================
+  # CDN geolocation headers are just headers: anyone who can reach an
+  # unprotected origin directly can send you a convincing set of them. Trackdown
+  # therefore marks every request-backed result :unverified unless you tell it
+  # how *you* know the request really came through your CDN.
+  #
+  # Whatever you already do to protect your origin is the answer here — an
+  # origin-only shared secret header, Cloudflare Authenticated Origin Pulls, an
+  # allowlisted edge IP range, or a flag your middleware already set:
+  #
+  # config.verify_request_came_through_trusted_cdn_path_with do |request|
+  #   ActiveSupport::SecurityUtils.secure_compare(
+  #     request.env['HTTP_X_ORIGIN_SECRET'].to_s, Rails.application.credentials.origin_secret.to_s
+  #   )
+  # end
+  #
+  # Results then report `source_trust` as :host_verified instead of :unverified,
+  # and `source_was_verified_by_host?` becomes true. Trackdown reports this; it
+  # does not act on it. Deciding what an unverified location may be used for is
+  # your application's call.
+  #
+  # https://developers.cloudflare.com/ssl/origin-configuration/authenticated-origin-pull/
+  # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-overview.html
+
+  # ========================================
   # General Options
   # ========================================
   # Reject private/local IP addresses (192.168.x.x, 127.0.0.1, etc.)

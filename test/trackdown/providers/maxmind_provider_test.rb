@@ -608,4 +608,38 @@ class MaxmindProviderTest < Minitest::Test
       end
     end
   end
+
+  # === What happens when the database itself misbehaves ===
+
+  def test_locate_raises_a_timeout_error_when_the_database_is_too_slow
+    with_maxmind_database(get_delay: 0.5) do
+      Trackdown.configuration.timeout = 0.01
+
+      error = assert_raises(Trackdown::Providers::MaxmindProvider::TimeoutError) do
+        Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+      end
+
+      assert_match(/timed out after 0.01 seconds/, error.message)
+    end
+  end
+
+  def test_locate_wraps_an_unexpected_database_failure
+    with_maxmind_database(get_error: IOError.new('the file went away')) do
+      error = assert_raises(Trackdown::Providers::MaxmindProvider::DatabaseError) do
+        Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+      end
+
+      assert_match(/Database error: the file went away/, error.message)
+    end
+  end
+
+  def test_locate_lets_a_trackdown_error_through_unchanged
+    with_maxmind_database(get_error: Trackdown::Error.new('something we already explained')) do
+      error = assert_raises(Trackdown::Error) do
+        Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
+      end
+
+      assert_equal 'something we already explained', error.message
+    end
+  end
 end

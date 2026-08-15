@@ -328,11 +328,4 @@ class AutoProviderTest < Minitest::Test
   end
 
   private
-
-  def reset_auto_provider_warnings
-    provider = Trackdown::Providers::AutoProvider
-    provider.instance_variable_set(:@warned_ip_mismatch, false)
-    provider.instance_variable_set(:@warned_ambiguous_edge, false)
-    provider.instance_variable_set(:@warned_no_providers, false)
-  end
 end

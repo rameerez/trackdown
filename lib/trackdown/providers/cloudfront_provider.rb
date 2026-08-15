@@ -70,6 +70,14 @@ module Trackdown
                        :LONGITUDE_RANGE
 
       class << self
+        def provider_name
+          :cloudfront
+        end
+
+        def provider_source
+          :cloudfront_request_headers
+        end
+
         # Check if CloudFront headers are available in the request
         def available?(request: nil)
           return false unless request
@@ -84,15 +92,16 @@ module Trackdown
         def locate(_ip, request: nil)
           raise Trackdown::Error, 'CloudfrontProvider requires a request object with CloudFront headers' unless request
 
+          provenance = request_provenance(request)
           country_code = extract_country_code(request)
 
           # If no valid country code, return unknown
-          return LocationResult.new(nil, 'Unknown', 'Unknown', '🏳️') if country_code.nil?
+          return LocationResult.unavailable(:provider_returned_unknown_country, **provenance) if country_code.nil?
 
-          build_location_result(country_code, request)
+          build_location_result(country_code, request, **provenance)
         end
 
-        def build_location_result(country_code, request)
+        def build_location_result(country_code, request, **provenance)
           LocationResult.new(
             country_code,
             get_country_name(country_code),
@@ -105,7 +114,8 @@ module Trackdown
             latitude: parse_coordinate(request.env[LATITUDE_HEADER], range: LATITUDE_RANGE),
             longitude: parse_coordinate(request.env[LONGITUDE_HEADER], range: LONGITUDE_RANGE),
             postal_code: extract_header(request, POSTAL_CODE_HEADER),
-            metro_code: extract_header(request, METRO_CODE_HEADER)
+            metro_code: extract_header(request, METRO_CODE_HEADER),
+            **provenance
           )
         end
 

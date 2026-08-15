@@ -35,6 +35,9 @@ module Trackdown
           end
         end
 
+        # Serve the database we just downloaded, not the one already open in memory.
+        Providers::MaxmindProvider.reset_database!
+
         Rails.logger.info("MaxMind database updated successfully") if defined?(Rails)
         true
       rescue OpenURI::HTTPError => e
