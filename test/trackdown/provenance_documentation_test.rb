@@ -191,6 +191,14 @@ class ProvenanceDocumentationTest < Minitest::Test
     end
   end
 
+  # If this ever fails, the dependency contract above is not being checked at all
+  # — better to say so loudly than to quietly pass.
+  def test_we_can_see_which_gems_ship_with_this_ruby
+    assert_includes gems_shipped_with_ruby, 'digest',
+                    "Ruby #{RUBY_VERSION} should ship digest; if we cannot see it in " \
+                    "#{Gem.default_specifications_dir} we cannot see any default gem"
+  end
+
   def test_every_optional_library_is_required_defensively
     OPTIONAL_LIBRARIES.each do |library|
       files = required_libraries.select { |name, _| name == library }.map(&:last)
@@ -222,7 +230,17 @@ class ProvenanceDocumentationTest < Minitest::Test
     root = library.split('/').first
     return true if root == 'rubygems'
 
-    Gem::Specification.find_all_by_name(root).any?(&:default_gem?)
+    gems_shipped_with_ruby.include?(root)
+  end
+
+  # Read the default-gem list straight off the Ruby installation. Asking
+  # Gem::Specification instead would be wrong under Bundler, which narrows it to
+  # the bundle and makes a gem that ships with Ruby look missing.
+  # https://docs.ruby-lang.org/en/3.4/standard_library_md.html
+  def gems_shipped_with_ruby
+    @gems_shipped_with_ruby ||=
+      Dir[File.join(Gem.default_specifications_dir, '*.gemspec')]
+      .map { |path| File.basename(path).sub(/-[^-]+\.gemspec\z/, '') }
   end
 
   def read(relative_path)
