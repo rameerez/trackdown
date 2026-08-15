@@ -123,7 +123,7 @@ class TrackdownTest < Minitest::Test
     Trackdown.configuration.database_path = '/fake/path.mmdb'
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, full_maxmind_record do
+      stub_maxmind_record(full_maxmind_record) do
         result = Trackdown.locate('8.8.8.8')
 
         assert_instance_of Trackdown::LocationResult, result
@@ -179,7 +179,7 @@ class TrackdownTest < Minitest::Test
     assert_in_delta(-122.4194, result.longitude)
   end
 
-  def test_locate_to_h_includes_all_fields_end_to_end
+  def test_locate_to_h_keeps_every_legacy_field_end_to_end
     Trackdown.configuration.provider = :cloudflare
     request = mock_cloudflare_request_with_all_headers
 

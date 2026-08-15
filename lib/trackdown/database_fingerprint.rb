@@ -6,25 +6,45 @@ module Trackdown
   # The identity of the MaxMind database file that answered a lookup.
   #
   # `build_epoch` comes straight from the database's own metadata, so it costs
-  # nothing. The SHA-256 digest costs a full read of a ~70 MB file, so it is
-  # computed the first time somebody asks for it and then reused for as long as
-  # the file stays put — once per database version, never once per lookup.
+  # nothing. The SHA-256 digest costs a full read of the database file, so it is
+  # computed the first time somebody asks for it and then reused by every
+  # reader bound to that exact file generation — never once per lookup.
   #
   # If the file changes underneath us the digest becomes `nil` rather than a
   # number that describes a file we are no longer reading.
   #
-  # MaxMind documents the metadata section of the .mmdb format here:
-  # https://maxmind.github.io/MaxMind-DB/
+  # MaxMind documents the exact build_epoch metadata field here:
+  # https://maxmind.github.io/MaxMind-DB/#build_epoch
   class DatabaseFingerprint
     READ_CHUNK_BYTES = 1 << 20 # 1 MiB
+    CAPTURE_CURRENT_FILE_IDENTITY = Object.new.freeze
+    private_constant :CAPTURE_CURRENT_FILE_IDENTITY
 
     attr_reader :path, :build_epoch
 
-    def initialize(path:, build_epoch: nil)
-      @path = path
+    def initialize(path:, build_epoch: nil, captured_file_identity: CAPTURE_CURRENT_FILE_IDENTITY)
+      @path = path.to_s.dup.freeze
       @build_epoch = build_epoch
-      @identity = file_identity
+      @identity = if captured_file_identity.equal?(CAPTURE_CURRENT_FILE_IDENTITY)
+                    current_file_identity
+                  else
+                    captured_file_identity
+                  end
       @mutex = Mutex.new
+    end
+
+    # Attach the metadata read by a database reader without losing the file
+    # identity captured *before* that reader opened the path. This is what keeps
+    # a reader that still has database A in memory from ever digesting database B
+    # after the path is replaced.
+    def with_build_epoch(build_epoch)
+      self.class.new(path: @path, build_epoch: build_epoch, captured_file_identity: @identity)
+    end
+
+    # Stable inside one process and suitable for sharing one lazy digest between
+    # all pooled readers that opened the same database generation.
+    def cache_key
+      [@path, @build_epoch, @identity].freeze
     end
 
     # When MaxMind built this database.
@@ -34,7 +54,7 @@ module Trackdown
 
     # Has the file been replaced since we fingerprinted it?
     def changed?
-      file_identity != @identity
+      current_file_identity != @identity
     end
 
     # The digest of the database we read, or nil if we can't honestly compute one.
@@ -57,7 +77,11 @@ module Trackdown
 
       digest = Digest::SHA256.new
       File.open(@path, 'rb') do |file|
+        return nil unless identity_of(file.stat) == @identity
+
         digest << file.read(READ_CHUNK_BYTES) until file.eof?
+
+        return nil unless identity_of(file.stat) == @identity
       end
 
       changed? ? nil : digest.hexdigest
@@ -65,11 +89,14 @@ module Trackdown
       nil
     end
 
-    def file_identity
-      stat = File.stat(@path)
-      [stat.size, stat.mtime, stat.ino]
+    def current_file_identity
+      identity_of(File.stat(@path))
     rescue SystemCallError
       nil
+    end
+
+    def identity_of(stat)
+      [stat.dev, stat.ino, stat.size, stat.mtime, stat.ctime].freeze
     end
   end
 end

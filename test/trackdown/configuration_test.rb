@@ -106,133 +106,169 @@ class ConfigurationTest < Minitest::Test
 
   # === Trusted CDN path verification ===
 
-  def test_no_verifier_by_default
+  def test_no_verifiers_by_default
     config = Trackdown::Configuration.new
 
-    assert_nil config.trusted_cdn_path_verifier
+    assert_nil config.trusted_cdn_path_verifier_for(:cloudflare)
+    assert_nil config.trusted_cdn_path_verifier_for(:cloudfront)
   end
 
   def test_nothing_is_trusted_without_a_verifier
     config = Trackdown::Configuration.new
 
-    refute config.request_came_through_trusted_cdn_path?(mock_request('HTTP_CF_IPCOUNTRY' => 'US'))
+    refute config.request_came_through_trusted_cdn_path?(
+      mock_request('HTTP_CF_IPCOUNTRY' => 'US'),
+      provider_name: :cloudflare
+    )
   end
 
-  def test_a_block_can_vouch_for_a_request
+  def test_a_cloudflare_block_can_vouch_only_for_cloudflare
     config = Trackdown::Configuration.new
-    config.verify_request_came_through_trusted_cdn_path_with { |request| request.env['SECRET'] == 'yes' }
+    config.verify_request_came_through_trusted_cloudflare_path_with do |request|
+      request.env['SECRET'] == 'yes'
+    end
 
-    assert config.request_came_through_trusted_cdn_path?(mock_request('SECRET' => 'yes'))
-    refute config.request_came_through_trusted_cdn_path?(mock_request('SECRET' => 'no'))
+    request = mock_request('SECRET' => 'yes')
+    assert config.request_came_through_trusted_cdn_path?(request, provider_name: :cloudflare)
+    refute config.request_came_through_trusted_cdn_path?(request, provider_name: :cloudfront)
+  end
+
+  def test_a_cloudfront_block_can_vouch_only_for_cloudfront
+    config = Trackdown::Configuration.new
+    config.verify_request_came_through_trusted_cloudfront_path_with do |request|
+      request.env['SECRET'] == 'yes'
+    end
+
+    request = mock_request('SECRET' => 'yes')
+    assert config.request_came_through_trusted_cdn_path?(request, provider_name: :cloudfront)
+    refute config.request_came_through_trusted_cdn_path?(request, provider_name: :cloudflare)
+  end
+
+  def test_the_provider_aware_lower_level_form_works
+    config = Trackdown::Configuration.new
+    config.verify_request_came_through_trusted_cdn_path_with(:cloudflare) do |request|
+      request.env.key?('SECRET')
+    end
+
+    assert config.request_came_through_trusted_cdn_path?(mock_request('SECRET' => 'yes'), provider_name: :cloudflare)
   end
 
   def test_a_lambda_can_vouch_for_a_request
     config = Trackdown::Configuration.new
-    config.verify_request_came_through_trusted_cdn_path_with(->(request) { request.env.key?('SECRET') })
+    config.verify_request_came_through_trusted_cloudflare_path_with(
+      ->(request) { request.env.key?('SECRET') }
+    )
 
-    assert config.request_came_through_trusted_cdn_path?(mock_request('SECRET' => 'yes'))
+    assert config.request_came_through_trusted_cdn_path?(mock_request('SECRET' => 'yes'), provider_name: :cloudflare)
   end
 
   def test_any_callable_can_vouch_for_a_request
     verifier = Object.new
     verifier.define_singleton_method(:call) { |_request| true }
     config = Trackdown::Configuration.new
-    config.verify_request_came_through_trusted_cdn_path_with(verifier)
+    config.verify_request_came_through_trusted_cloudfront_path_with(verifier)
 
-    assert config.request_came_through_trusted_cdn_path?(mock_request)
-  end
-
-  def test_the_verifier_can_be_assigned_directly
-    config = Trackdown::Configuration.new
-    config.trusted_cdn_path_verifier = ->(_request) { true }
-
-    assert config.request_came_through_trusted_cdn_path?(mock_request)
-  end
-
-  def test_the_verifier_can_be_cleared
-    config = Trackdown::Configuration.new
-    config.verify_request_came_through_trusted_cdn_path_with { true }
-    config.trusted_cdn_path_verifier = nil
-
-    assert_nil config.trusted_cdn_path_verifier
-    refute config.request_came_through_trusted_cdn_path?(mock_request)
-  end
-
-  def test_the_original_cloudflare_specific_name_still_works
-    config = Trackdown::Configuration.new
-    config.verify_request_came_through_trusted_cloudflare_path_with { |request| request.env['SECRET'] == 'yes' }
-
-    assert config.request_came_through_trusted_cdn_path?(mock_request('SECRET' => 'yes'))
+    assert config.request_came_through_trusted_cdn_path?(mock_request, provider_name: :cloudfront)
   end
 
   def test_a_verifier_that_cannot_be_called_is_rejected_immediately
     config = Trackdown::Configuration.new
 
     error = assert_raises(ArgumentError) do
-      config.verify_request_came_through_trusted_cdn_path_with('trust me')
+      config.verify_request_came_through_trusted_cloudflare_path_with('trust me')
     end
 
-    assert_match(/must respond to #call/, error.message)
+    assert_match(/trusted cloudflare path verifier must respond to #call/i, error.message)
+  end
+
+  def test_an_unknown_trusted_cdn_provider_is_rejected
+    config = Trackdown::Configuration.new
+
+    error = assert_raises(ArgumentError) do
+      config.verify_request_came_through_trusted_cdn_path_with(:somewhere_else) { true }
+    end
+
+    assert_match(/Invalid trusted CDN provider: :somewhere_else/, error.message)
+    assert_match(/cloudflare, cloudfront/, error.message)
+  end
+
+  def test_an_unknown_provider_cannot_be_queried_for_trust
+    config = Trackdown::Configuration.new
+
+    error = assert_raises(ArgumentError) do
+      config.request_came_through_trusted_cdn_path?(mock_request, provider_name: :somewhere_else)
+    end
+
+    assert_match(/Invalid trusted CDN provider: :somewhere_else/, error.message)
   end
 
   def test_no_verifier_and_no_block_is_rejected
     config = Trackdown::Configuration.new
 
-    assert_raises(ArgumentError) { config.verify_request_came_through_trusted_cdn_path_with }
+    error = assert_raises(ArgumentError) do
+      config.verify_request_came_through_trusted_cloudflare_path_with
+    end
+
+    assert_match(/needs a block or a callable/, error.message)
   end
 
   def test_a_truthy_answer_is_enough
     config = Trackdown::Configuration.new
-    config.verify_request_came_through_trusted_cdn_path_with { 'anything truthy' }
+    config.verify_request_came_through_trusted_cloudflare_path_with { 'anything truthy' }
 
-    assert_equal true, config.request_came_through_trusted_cdn_path?(mock_request)
+    assert_equal true, config.request_came_through_trusted_cdn_path?(mock_request, provider_name: :cloudflare)
   end
 
   def test_a_falsy_answer_means_unverified
     config = Trackdown::Configuration.new
-    config.verify_request_came_through_trusted_cdn_path_with { nil }
+    config.verify_request_came_through_trusted_cloudflare_path_with { nil }
 
-    assert_equal false, config.request_came_through_trusted_cdn_path?(mock_request)
+    assert_equal false, config.request_came_through_trusted_cdn_path?(mock_request, provider_name: :cloudflare)
   end
 
   def test_nothing_is_verified_without_a_request
     config = Trackdown::Configuration.new
-    config.verify_request_came_through_trusted_cdn_path_with { true }
+    config.verify_request_came_through_trusted_cloudflare_path_with { true }
 
-    refute config.request_came_through_trusted_cdn_path?(nil)
+    refute config.request_came_through_trusted_cdn_path?(nil, provider_name: :cloudflare)
   end
 
   def test_a_verifier_that_blows_up_means_unverified
     config = Trackdown::Configuration.new
-    config.verify_request_came_through_trusted_cdn_path_with { raise 'no idea' }
+    config.verify_request_came_through_trusted_cloudflare_path_with { raise 'no idea' }
 
     output = capture_stderr do
-      refute config.request_came_through_trusted_cdn_path?(mock_request)
+      refute config.request_came_through_trusted_cdn_path?(mock_request, provider_name: :cloudflare)
     end
 
-    assert_match(/trusted CDN path verifier raised RuntimeError: no idea/, output)
+    assert_match(/trusted cloudflare path verifier raised RuntimeError: no idea/, output)
     assert_match(/:unverified/, output)
   end
 
   def test_a_verifier_that_blows_up_complains_only_once
     config = Trackdown::Configuration.new
-    config.verify_request_came_through_trusted_cdn_path_with { raise 'no idea' }
+    config.verify_request_came_through_trusted_cloudflare_path_with { raise 'no idea' }
 
     output = capture_stderr do
-      3.times { config.request_came_through_trusted_cdn_path?(mock_request) }
+      3.times do
+        config.request_came_through_trusted_cdn_path?(mock_request, provider_name: :cloudflare)
+      end
     end
 
-    assert_equal 1, output.scan(/trusted CDN path verifier raised/).length
+    assert_equal 1, output.scan(/trusted cloudflare path verifier raised/).length
   end
 
-  def test_a_replacement_verifier_gets_its_own_warning
+  def test_each_provider_gets_its_own_warning
     config = Trackdown::Configuration.new
-    config.verify_request_came_through_trusted_cdn_path_with { raise 'first' }
-    capture_stderr { config.request_came_through_trusted_cdn_path?(mock_request) }
+    config.verify_request_came_through_trusted_cloudflare_path_with { raise 'cloudflare failed' }
+    config.verify_request_came_through_trusted_cloudfront_path_with { raise 'cloudfront failed' }
 
-    config.verify_request_came_through_trusted_cdn_path_with { raise 'second' }
-    output = capture_stderr { config.request_came_through_trusted_cdn_path?(mock_request) }
+    output = capture_stderr do
+      config.request_came_through_trusted_cdn_path?(mock_request, provider_name: :cloudflare)
+      config.request_came_through_trusted_cdn_path?(mock_request, provider_name: :cloudfront)
+    end
 
-    assert_match(/raised RuntimeError: second/, output)
+    assert_match(/cloudflare failed/, output)
+    assert_match(/cloudfront failed/, output)
   end
 end

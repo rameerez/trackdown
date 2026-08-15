@@ -27,6 +27,12 @@ class CloudflareProviderTest < Minitest::Test
     refute Trackdown::Providers::CloudflareProvider.available?(request: request)
   end
 
+  def test_available_returns_false_with_the_unicode_unknown_territory_code
+    request = mock_cloudflare_request(country: 'ZZ')
+
+    refute Trackdown::Providers::CloudflareProvider.available?(request: request)
+  end
+
   def test_available_returns_true_with_valid_header
     request = mock_cloudflare_request
     assert Trackdown::Providers::CloudflareProvider.available?(request: request)
@@ -91,6 +97,7 @@ class CloudflareProviderTest < Minitest::Test
     assert_equal 'T1', result.country_code
     # T1 is not a real country code, so it should return Unknown
     assert_equal 'Unknown', result.country_name
+    assert_equal '🏳️', result.flag_emoji
   end
 
   def test_locate_returns_location_result
@@ -153,6 +160,56 @@ class CloudflareProviderTest < Minitest::Test
     result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
 
     assert_in_delta(-122.4194, result.longitude)
+  end
+
+  def test_locate_rejects_non_finite_and_out_of_range_coordinates
+    ['NaN', 'Infinity', '-Infinity', '1e1000', '91', '-91'].each do |latitude|
+      result = Trackdown::Providers::CloudflareProvider.locate(
+        '8.8.8.8',
+        request: mock_cloudflare_request(latitude: latitude)
+      )
+
+      assert_nil result.latitude, latitude
+    end
+
+    ['NaN', 'Infinity', '-Infinity', '1e1000', '181', '-181'].each do |longitude|
+      result = Trackdown::Providers::CloudflareProvider.locate(
+        '8.8.8.8',
+        request: mock_cloudflare_request(longitude: longitude)
+      )
+
+      assert_nil result.longitude, longitude
+    end
+  end
+
+  def test_available_rejects_a_malformed_country_header_without_raising
+    [123, 'ß', 'USA', '1!'].each do |country|
+      request = mock_cloudflare_request(country: country)
+
+      refute Trackdown::Providers::CloudflareProvider.available?(request: request), country.inspect
+    end
+  end
+
+  def test_available_rejects_an_invalidly_encoded_country_header_without_raising
+    invalid_utf8 = "\xFF".dup.force_encoding(Encoding::UTF_8)
+    request = mock_cloudflare_request(country: invalid_utf8)
+
+    refute Trackdown::Providers::CloudflareProvider.available?(request: request)
+  end
+
+  def test_locate_ignores_non_string_optional_headers
+    request = mock_cloudflare_request(country: 'US')
+    request.env.merge!(
+      'HTTP_CF_IPCITY' => 123,
+      'HTTP_CF_REGION' => 123,
+      'HTTP_CF_IPLATITUDE' => 123
+    )
+
+    result = Trackdown::Providers::CloudflareProvider.locate('8.8.8.8', request: request)
+
+    assert_equal 'Unknown', result.city
+    assert_nil result.region
+    assert_nil result.latitude
   end
 
   def test_locate_extracts_timezone_header

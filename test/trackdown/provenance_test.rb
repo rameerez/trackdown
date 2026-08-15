@@ -158,7 +158,7 @@ class ProvenanceTest < Minitest::Test
   end
 
   def test_the_host_can_vouch_for_a_cloudfront_request
-    verify_trusted_cdn_path_with_header
+    verify_trusted_cdn_path_with_header(provider_name: :cloudfront)
     request = cloudfront_request
     request.env['HTTP_X_ORIGIN_SECRET'] = 'shared-secret'
 
@@ -167,11 +167,37 @@ class ProvenanceTest < Minitest::Test
     assert_equal :host_verified, result.source_trust
   end
 
+  def test_a_trusted_cloudfront_path_cannot_vouch_for_cloudflare_headers
+    # CloudFront's AllViewerAndCloudFrontHeaders policy forwards every viewer
+    # header, so a viewer can supply CF-* names. A valid CloudFront origin secret
+    # must therefore never authenticate a Cloudflare result:
+    # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-origin-request-policies.html#managed-origin-request-policy-all-viewer-and-cloudfront
+    verify_trusted_cdn_path_with_header(provider_name: :cloudfront)
+    request = cloudflare_request
+    request.env['HTTP_X_ORIGIN_SECRET'] = 'shared-secret'
+
+    result = Trackdown.locate('203.0.113.9', request: request)
+
+    assert_equal :cloudflare_request_headers, result.provider_source
+    assert_equal :unverified, result.source_trust
+  end
+
+  def test_a_trusted_cloudflare_path_cannot_vouch_for_cloudfront_headers
+    verify_trusted_cdn_path_with_header(provider_name: :cloudflare)
+    request = cloudfront_request
+    request.env['HTTP_X_ORIGIN_SECRET'] = 'shared-secret'
+
+    result = Trackdown.locate('203.0.113.9', request: request)
+
+    assert_equal :cloudfront_request_headers, result.provider_source
+    assert_equal :unverified, result.source_trust
+  end
+
   def test_the_verifier_sees_the_request_it_is_judging
     seen = nil
     request = cloudflare_request
     Trackdown.configure do |config|
-      config.verify_request_came_through_trusted_cdn_path_with { |candidate| seen = candidate }
+      config.verify_request_came_through_trusted_cloudflare_path_with { |candidate| seen = candidate }
     end
 
     Trackdown.locate('203.0.113.9', request: request)
@@ -253,7 +279,7 @@ class ProvenanceTest < Minitest::Test
     end
   end
 
-  def test_maxmind_digests_the_database_once_per_version_not_once_per_lookup
+  def test_maxmind_digests_once_per_open_database_generation_not_once_per_lookup
     with_maxmind_database do |path|
       first = Trackdown::Providers::MaxmindProvider.locate('203.0.113.9')
       fingerprint = Trackdown::Providers::MaxmindProvider.database_fingerprint
@@ -336,6 +362,42 @@ class ProvenanceTest < Minitest::Test
     end
   end
 
+  def test_each_result_keeps_the_fingerprint_of_the_reader_that_answered
+    # MODE_MEMORY readers keep the bytes they opened even after the path changes:
+    # https://github.com/maxmind/MaxMind-DB-Reader-ruby/blob/v1.2.0/lib/maxmind/db/memory_reader.rb#L7-L15
+    # A real connection pool can therefore briefly contain readers from two
+    # database generations. Their provenance must never cross.
+    with_maxmind_database_file('old database bytes') do |path|
+      old_reader = TestHelpers::MaxmindStubs::FakeReader.new(
+        record: full_maxmind_record.merge('country' => { 'iso_code' => 'US', 'names' => { 'en' => 'United States' } }),
+        build_epoch: 1
+      )
+      old_database_reader = TestHelpers::MaxmindStubs.database_reader_for(old_reader)
+
+      File.binwrite(path, 'new database bytes')
+      new_reader = TestHelpers::MaxmindStubs::FakeReader.new(
+        record: full_maxmind_record.merge('country' => { 'iso_code' => 'GB', 'names' => { 'en' => 'United Kingdom' } }),
+        build_epoch: 2
+      )
+      new_database_reader = TestHelpers::MaxmindStubs.database_reader_for(new_reader)
+      pool = TestHelpers::MaxmindStubs::FakeReaderSequencePool.new(
+        [old_database_reader, new_database_reader, old_database_reader]
+      )
+      open_maxmind_pool(pool)
+
+      old_result = Trackdown::Providers::MaxmindProvider.locate('203.0.113.1')
+      new_result = Trackdown::Providers::MaxmindProvider.locate('203.0.113.2')
+      old_result_again = Trackdown::Providers::MaxmindProvider.locate('203.0.113.3')
+
+      assert_equal ['US', 1], [old_result.country_code, old_result.database_build_epoch]
+      assert_equal ['GB', 2], [new_result.country_code, new_result.database_build_epoch]
+      assert_equal ['US', 1], [old_result_again.country_code, old_result_again.database_build_epoch]
+      assert_nil old_result.database_sha256, 'an old reader must never digest the new file now at its path'
+      assert_nil old_result_again.database_sha256
+      assert_equal Digest::SHA256.hexdigest('new database bytes'), new_result.database_sha256
+    end
+  end
+
   def test_a_result_digest_is_safe_to_read_from_several_threads
     with_maxmind_database do
       result = Trackdown::Providers::MaxmindProvider.locate('203.0.113.9')
@@ -364,7 +426,7 @@ class ProvenanceTest < Minitest::Test
 
     Trackdown::Providers::MaxmindProvider.reset_database!
 
-    assert_nil Trackdown::Providers::MaxmindProvider.class_variable_get(:@@reader_pool)
+    assert_nil Trackdown::Providers::MaxmindProvider.instance_variable_get(:@reader_pool)
     assert_nil Trackdown::Providers::MaxmindProvider.database_fingerprint
   end
 
@@ -382,16 +444,29 @@ class ProvenanceTest < Minitest::Test
       result = Trackdown::Providers::MaxmindProvider.locate('203.0.113.9')
 
       assert_equal 'US', result.country_code
+      assert_equal 1, result.database_build_epoch
+      assert_equal Digest::SHA256.hexdigest('a pretend GeoLite2-City database'), result.database_sha256
     end
   end
 
   def test_maxmind_re_fingerprints_when_the_database_underneath_it_is_replaced
-    with_maxmind_database(build_epoch: 1_700_000_000) do |path, reader|
+    with_maxmind_database_file do |path|
+      old_reader = TestHelpers::MaxmindStubs::FakeReader.new(
+        record: full_maxmind_record,
+        build_epoch: 1_700_000_000
+      )
+      open_maxmind_pool(TestHelpers::MaxmindStubs::FakeReaderPool.new(old_reader))
       Trackdown::Providers::MaxmindProvider.locate('203.0.113.9')
 
-      # The .mmdb is replaced by another process, and this reader now serves it.
+      # The .mmdb is replaced by another process and a newly opened reader serves it.
+      # An existing MODE_MEMORY reader intentionally keeps serving its old bytes:
+      # https://github.com/maxmind/MaxMind-DB-Reader-ruby/blob/v1.2.0/lib/maxmind/db/memory_reader.rb#L7-L15
       File.binwrite(path, 'a newer GeoLite2-City database')
-      reader.instance_variable_set(:@metadata, TestHelpers::MaxmindStubs::FakeMetadata.new(1_800_000_000))
+      new_reader = TestHelpers::MaxmindStubs::FakeReader.new(
+        record: full_maxmind_record,
+        build_epoch: 1_800_000_000
+      )
+      open_maxmind_pool(TestHelpers::MaxmindStubs::FakeReaderPool.new(new_reader))
 
       result = Trackdown::Providers::MaxmindProvider.locate('203.0.113.9')
 
@@ -462,6 +537,7 @@ class ProvenanceTest < Minitest::Test
     result = Trackdown::Providers::CloudflareProvider.locate('203.0.113.9', request: mock_request_with_tor)
 
     assert_equal 'T1', result.country_code, 'the code Cloudflare sent is preserved'
+    assert_equal '🏳️', result.flag_emoji, 'a pseudo-code must not render a broken regional-indicator glyph'
     assert_predicate result, :unavailable?
     assert_equal :provider_returned_unknown_country, result.unavailable_reason
   end
@@ -487,6 +563,8 @@ class ProvenanceTest < Minitest::Test
 
     assert_predicate result, :unavailable?
     assert_equal :provider_returned_unknown_country, result.unavailable_reason
+    assert_nil result.country_code
+    assert_equal 'Unknown', result.country_name
     assert_equal :cloudfront, result.provider_name
   end
 
@@ -500,6 +578,7 @@ class ProvenanceTest < Minitest::Test
       assert_equal :provider_data_incomplete, result.unavailable_reason
       assert_equal 'Somewhere', result.city, 'partial data is still handed back'
       assert_in_delta 1.0, result.latitude
+      assert_predicate result, :estimated?, 'partial provider-derived coordinates remain estimates'
     end
   end
 
@@ -690,7 +769,7 @@ class ProvenanceTest < Minitest::Test
 
   def test_the_full_hash_still_carries_everything_including_provenance
     result = Trackdown.locate('203.0.113.9', request: cloudflare_request)
-    hash = result.to_h
+    hash = result.to_h(include_provenance: true)
 
     assert_equal 'US', hash[:country_code]
     assert_equal :cloudflare, hash[:provider_name]

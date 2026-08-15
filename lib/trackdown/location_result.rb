@@ -35,7 +35,8 @@ module Trackdown
 
     # How much the host vouches for the source of a request-backed result.
     # :host_verified only ever comes from the host's own verifier — see
-    # Trackdown::Configuration#verify_request_came_through_trusted_cdn_path_with.
+    # Trackdown::Configuration#verify_request_came_through_trusted_cloudflare_path_with
+    # and #verify_request_came_through_trusted_cloudfront_path_with.
     SOURCE_TRUSTS = %i[unverified host_verified].freeze
 
     # Where the IP is.
@@ -56,12 +57,13 @@ module Trackdown
     # Every field #to_h can emit, in the order it emits them.
     FIELDS = (LOCATION_FIELDS + PROVENANCE_FIELDS + %i[country_info]).freeze
 
-    # What #to_h emits when you don't ask for anything in particular.
-    #
-    # The digest is the one field that costs real work — a full read of the
-    # database file — so serializing "everything" deliberately stops short of it.
-    # Name it in `only:` when you want it, and never pay for it when you don't.
-    DEFAULT_FIELDS = (FIELDS - %i[database_sha256]).freeze
+    # The exact hash shape Trackdown returned before provenance existed. Keeping
+    # this as the no-argument default is an API compatibility guarantee.
+    LEGACY_FIELDS = (LOCATION_FIELDS + %i[country_info]).freeze
+    DEFAULT_FIELDS = LEGACY_FIELDS
+
+    # The whole result except the database digest, whose first read is expensive.
+    FIELDS_WITHOUT_DATABASE_SHA256 = (FIELDS - %i[database_sha256]).freeze
 
     attr_reader :country_code, :country_name, :city, :flag_emoji,
                 :region, :region_code, :continent, :timezone, :latitude, :longitude,
@@ -118,6 +120,9 @@ module Trackdown
       if reason.nil?
         raise ArgumentError, "An unavailable result has to say why. Must be one of: #{UNAVAILABLE_REASONS.join(', ')}"
       end
+      if provenance.key?(:unavailable_reason)
+        raise ArgumentError, 'Pass the unavailable reason once, as the first argument to LocationResult.unavailable'
+      end
 
       new(nil, UNKNOWN, UNKNOWN, UNKNOWN_FLAG, unavailable_reason: reason, **provenance)
     end
@@ -138,11 +143,12 @@ module Trackdown
       !available?
     end
 
-    # Always true for a resolved location: GeoIP infers where an address is
-    # likely to be, and never proves where anyone was. A lookup that resolved
-    # nothing estimated nothing.
+    # True whenever a provider resolved any location data, including a partial
+    # result that has a city or coordinates but no country. Availability answers
+    # "could we name a country?"; estimated answers "is any returned location an
+    # inference?" Those are deliberately independent questions.
     def estimated?
-      available?
+      available? || partial_location_estimate?
     end
 
     # True only when the host's own verifier vouched for this request's path.
@@ -174,6 +180,7 @@ module Trackdown
     #   result.to_h
     #   result.to_h(only: %i[country_code city latitude longitude provider_name])
     #   result.to_h(include_country_info: false)
+    #   result.to_h(include_provenance: true)
     #
     # @param only [Array<Symbol>, Symbol, nil] the exact fields to serialize, in
     #   the order you name them. What you name is what you get: naming a field
@@ -183,9 +190,14 @@ module Trackdown
     # @param include_country_info [Boolean] the derived `countries` gem payload is
     #   large; pass false to leave it out of the default shape. Ignored when you
     #   pass `only:`, which already says exactly what you want.
-    def to_h(only: nil, include_country_info: true)
+    # @param include_provenance [Boolean] add every provenance field except the
+    #   database digest, whose first read costs a full pass over the database file.
+    #   Ignored when `only:` names an exact shape.
+    def to_h(only: nil, include_country_info: true, include_provenance: false)
       fields = if only
                  requested_fields(only)
+               elsif include_provenance
+                 provenance_fields(include_country_info: include_country_info)
                elsif include_country_info
                  DEFAULT_FIELDS
                else
@@ -218,6 +230,12 @@ module Trackdown
       fields.uniq
     end
 
+    def provenance_fields(include_country_info:)
+      return FIELDS_WITHOUT_DATABASE_SHA256 if include_country_info
+
+      FIELDS_WITHOUT_DATABASE_SHA256 - %i[country_info]
+    end
+
     def validate!(value, allowed, description)
       return nil if value.nil?
       return value if allowed.include?(value)
@@ -227,6 +245,16 @@ module Trackdown
 
     def blank?(value)
       value.nil? || (value.respond_to?(:empty?) && value.empty?)
+    end
+
+    def partial_location_estimate?
+      named_place = [@country_name, @city].any? { |value| !blank?(value) && value != UNKNOWN }
+      provider_fields = [
+        @region, @region_code, @continent, @timezone,
+        @latitude, @longitude, @postal_code, @metro_code
+      ]
+
+      named_place || provider_fields.any? { |value| !blank?(value) }
     end
   end
 end

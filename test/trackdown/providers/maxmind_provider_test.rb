@@ -41,7 +41,7 @@ class MaxmindProviderTest < Minitest::Test
     }
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, mock_record do
+      stub_maxmind_record(mock_record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_equal 'US', result.country_code
@@ -62,7 +62,7 @@ class MaxmindProviderTest < Minitest::Test
     }
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, mock_record do
+      stub_maxmind_record(mock_record) do
         result = Trackdown::Providers::MaxmindProvider.locate('1.2.3.4')
 
         assert_equal 'United Kingdom', result.country_name
@@ -83,7 +83,7 @@ class MaxmindProviderTest < Minitest::Test
     }
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, mock_record do
+      stub_maxmind_record(mock_record) do
         result = Trackdown::Providers::MaxmindProvider.locate('5.6.7.8')
 
         assert_equal 'Paris', result.city
@@ -95,7 +95,7 @@ class MaxmindProviderTest < Minitest::Test
     Trackdown.configuration.database_path = '/fake/path.mmdb'
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, nil do
+      stub_maxmind_record(nil) do
         result = Trackdown::Providers::MaxmindProvider.locate('127.0.0.1')
 
         assert_nil result.country_code
@@ -116,7 +116,7 @@ class MaxmindProviderTest < Minitest::Test
     }
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, mock_record do
+      stub_maxmind_record(mock_record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_instance_of Trackdown::LocationResult, result
@@ -138,7 +138,7 @@ class MaxmindProviderTest < Minitest::Test
     }
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, mock_record do
+      stub_maxmind_record(mock_record) do
         result = Trackdown::Providers::MaxmindProvider.locate('1.2.3.4')
 
         assert_equal 'Germany', result.country_name
@@ -159,7 +159,7 @@ class MaxmindProviderTest < Minitest::Test
     }
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, mock_record do
+      stub_maxmind_record(mock_record) do
         result = Trackdown::Providers::MaxmindProvider.locate('1.2.3.4')
 
         assert_equal 'Deutschland', result.country_name
@@ -183,7 +183,7 @@ class MaxmindProviderTest < Minitest::Test
     }
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, mock_record do
+      stub_maxmind_record(mock_record) do
         result = Trackdown::Providers::MaxmindProvider.locate('1.2.3.4')
 
         assert_equal 'Lyon', result.city
@@ -202,7 +202,7 @@ class MaxmindProviderTest < Minitest::Test
     }
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, mock_record do
+      stub_maxmind_record(mock_record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_equal 'Unknown', result.city
@@ -220,7 +220,7 @@ class MaxmindProviderTest < Minitest::Test
     }
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, mock_record do
+      stub_maxmind_record(mock_record) do
         result = Trackdown::Providers::MaxmindProvider.locate('1.2.3.4')
 
         assert_equal 'Unknown', result.country_name
@@ -234,7 +234,7 @@ class MaxmindProviderTest < Minitest::Test
     Trackdown.configuration.database_path = '/fake/path.mmdb'
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, full_maxmind_record do
+      stub_maxmind_record(full_maxmind_record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_equal 'California', result.region
@@ -248,7 +248,7 @@ class MaxmindProviderTest < Minitest::Test
     record['subdivisions'][0]['names'] = { 'de' => 'Kalifornien' }
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+      stub_maxmind_record(record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_equal 'Kalifornien', result.region
@@ -262,7 +262,7 @@ class MaxmindProviderTest < Minitest::Test
     record.delete('subdivisions')
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+      stub_maxmind_record(record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_nil result.region
@@ -274,7 +274,7 @@ class MaxmindProviderTest < Minitest::Test
     Trackdown.configuration.database_path = '/fake/path.mmdb'
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, full_maxmind_record do
+      stub_maxmind_record(full_maxmind_record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_equal 'CA', result.region_code
@@ -288,7 +288,7 @@ class MaxmindProviderTest < Minitest::Test
     record.delete('subdivisions')
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+      stub_maxmind_record(record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_nil result.region_code
@@ -300,7 +300,7 @@ class MaxmindProviderTest < Minitest::Test
     Trackdown.configuration.database_path = '/fake/path.mmdb'
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, full_maxmind_record do
+      stub_maxmind_record(full_maxmind_record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_equal 'NA', result.continent
@@ -314,7 +314,7 @@ class MaxmindProviderTest < Minitest::Test
     record.delete('continent')
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+      stub_maxmind_record(record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_nil result.continent
@@ -326,7 +326,7 @@ class MaxmindProviderTest < Minitest::Test
     Trackdown.configuration.database_path = '/fake/path.mmdb'
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, full_maxmind_record do
+      stub_maxmind_record(full_maxmind_record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_equal 'America/Los_Angeles', result.timezone
@@ -340,7 +340,7 @@ class MaxmindProviderTest < Minitest::Test
     record.delete('location')
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+      stub_maxmind_record(record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_nil result.timezone
@@ -352,7 +352,7 @@ class MaxmindProviderTest < Minitest::Test
     Trackdown.configuration.database_path = '/fake/path.mmdb'
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, full_maxmind_record do
+      stub_maxmind_record(full_maxmind_record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_in_delta 37.7749, result.latitude
@@ -364,7 +364,7 @@ class MaxmindProviderTest < Minitest::Test
     Trackdown.configuration.database_path = '/fake/path.mmdb'
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, full_maxmind_record do
+      stub_maxmind_record(full_maxmind_record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_in_delta(-122.4194, result.longitude)
@@ -378,7 +378,7 @@ class MaxmindProviderTest < Minitest::Test
     record.delete('location')
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+      stub_maxmind_record(record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_nil result.latitude
@@ -394,7 +394,7 @@ class MaxmindProviderTest < Minitest::Test
     record['location']['longitude'] = 0.0
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+      stub_maxmind_record(record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_in_delta 0.0, result.latitude
@@ -412,7 +412,7 @@ class MaxmindProviderTest < Minitest::Test
     ]
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+      stub_maxmind_record(record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_equal 'California', result.region
@@ -429,7 +429,7 @@ class MaxmindProviderTest < Minitest::Test
     }
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+      stub_maxmind_record(record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_nil result.region
@@ -446,7 +446,7 @@ class MaxmindProviderTest < Minitest::Test
     }
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+      stub_maxmind_record(record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_nil result.timezone
@@ -460,7 +460,7 @@ class MaxmindProviderTest < Minitest::Test
     Trackdown.configuration.database_path = '/fake/path.mmdb'
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, nil do
+      stub_maxmind_record(nil) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_nil result.region
@@ -479,7 +479,7 @@ class MaxmindProviderTest < Minitest::Test
     Trackdown.configuration.database_path = '/fake/path.mmdb'
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, full_maxmind_record do
+      stub_maxmind_record(full_maxmind_record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_equal 'US', result.country_code
@@ -503,7 +503,7 @@ class MaxmindProviderTest < Minitest::Test
     record['subdivisions'] = []
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+      stub_maxmind_record(record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_nil result.region
@@ -518,7 +518,7 @@ class MaxmindProviderTest < Minitest::Test
     record['location'].delete('time_zone')
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+      stub_maxmind_record(record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_nil result.timezone
@@ -534,7 +534,7 @@ class MaxmindProviderTest < Minitest::Test
     Trackdown.configuration.database_path = '/fake/path.mmdb'
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, full_maxmind_record do
+      stub_maxmind_record(full_maxmind_record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_equal '94107', result.postal_code
@@ -546,7 +546,7 @@ class MaxmindProviderTest < Minitest::Test
     Trackdown.configuration.database_path = '/fake/path.mmdb'
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, full_maxmind_record do
+      stub_maxmind_record(full_maxmind_record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_equal '807', result.metro_code
@@ -560,7 +560,7 @@ class MaxmindProviderTest < Minitest::Test
     record.delete('postal')
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+      stub_maxmind_record(record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_nil result.postal_code
@@ -574,7 +574,7 @@ class MaxmindProviderTest < Minitest::Test
     record['location'].delete('metro_code')
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+      stub_maxmind_record(record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_nil result.metro_code
@@ -588,7 +588,7 @@ class MaxmindProviderTest < Minitest::Test
     record['location']['metro_code'] = 501
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, record do
+      stub_maxmind_record(record) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_equal '501', result.metro_code
@@ -600,7 +600,7 @@ class MaxmindProviderTest < Minitest::Test
     Trackdown.configuration.database_path = '/fake/path.mmdb'
 
     File.stub :exist?, true do
-      Trackdown::Providers::MaxmindProvider.stub :fetch_record, nil do
+      stub_maxmind_record(nil) do
         result = Trackdown::Providers::MaxmindProvider.locate('8.8.8.8')
 
         assert_nil result.postal_code

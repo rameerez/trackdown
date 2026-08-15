@@ -87,6 +87,17 @@ class CloudfrontProviderTest < Minitest::Test
     assert_equal 'US', result.country_code
   end
 
+  def test_locate_preserves_a_well_formed_country_code_missing_from_the_country_catalog
+    request = mock_cloudfront_request(country: 'XK', city: 'Pristina')
+    result = Trackdown::Providers::CloudfrontProvider.locate('8.8.8.8', request: request)
+
+    assert_equal 'XK', result.country_code
+    assert_equal 'Unknown', result.country_name
+    assert_equal 'Pristina', result.city
+    assert_equal '🇽🇰', result.flag_emoji
+    assert_predicate result, :available?
+  end
+
   def test_locate_with_multiple_countries
     [
       ['FR', 'Paris', '🇫🇷'],

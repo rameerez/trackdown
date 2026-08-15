@@ -10,9 +10,10 @@ module TestHelpers
     end
 
     # Teach Trackdown how this host proves a request really came through its CDN.
-    def verify_trusted_cdn_path_with_header(name = 'HTTP_X_ORIGIN_SECRET', value = 'shared-secret')
+    def verify_trusted_cdn_path_with_header(provider_name: :cloudflare,
+                                            name: 'HTTP_X_ORIGIN_SECRET', value: 'shared-secret')
       Trackdown.configure do |config|
-        config.verify_request_came_through_trusted_cdn_path_with do |request|
+        config.verify_request_came_through_trusted_cdn_path_with(provider_name) do |request|
           request.env[name] == value
         end
       end

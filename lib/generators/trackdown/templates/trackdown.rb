@@ -97,22 +97,45 @@ Trackdown.configure do |config|
   # config.memory_mode = MaxMind::DB::MODE_MEMORY # or MODE_FILE to reduce memory
 
   # ========================================
-  # Trusted CDN Path Verification (optional)
+  # Trusted CDN Path Verification (optional, provider-specific)
   # ========================================
   # CDN geolocation headers are just headers: anyone who can reach an
   # unprotected origin directly can send you a convincing set of them. Trackdown
   # therefore marks every request-backed result :unverified unless you tell it
-  # how *you* know the request really came through your CDN.
+  # how *you* know the request really came through that specific CDN. Keep these
+  # checks separate: a trusted CloudFront request must not authenticate CF-*
+  # headers that CloudFront forwarded from a viewer, and vice versa.
   #
-  # Whatever you already do to protect your origin is the answer here — an
-  # origin-only shared secret header, Cloudflare Authenticated Origin Pulls, an
-  # allowlisted edge IP range, or a flag your middleware already set:
+  # Cloudflare example: have the ingress/middleware that actually checked
+  # Authenticated Origin Pulls or the Cloudflare peer network set this private
+  # Rack-environment flag. A viewer must never be able to set it:
   #
-  # config.verify_request_came_through_trusted_cdn_path_with do |request|
-  #   ActiveSupport::SecurityUtils.secure_compare(
-  #     request.env['HTTP_X_ORIGIN_SECRET'].to_s, Rails.application.credentials.origin_secret.to_s
-  #   )
+  # config.verify_request_came_through_trusted_cloudflare_path_with do |request|
+  #   request.env['my_app.cloudflare_origin_was_verified'] == true
   # end
+  #
+  # CloudFront example: require the origin-only custom header configured on the
+  # distribution. Refuse to boot if the expected secret is absent, and require
+  # a non-empty supplied value before comparing:
+  #
+  # expected_cloudfront_origin_secret =
+  #   Rails.application.credentials.dig(:cloudfront, :origin_secret).to_s
+  # raise 'Missing CloudFront origin secret' if expected_cloudfront_origin_secret.empty?
+  #
+  # config.verify_request_came_through_trusted_cloudfront_path_with do |request|
+  #   supplied_cloudfront_origin_secret =
+  #     request.env['HTTP_X_CLOUDFRONT_ORIGIN_SECRET'].to_s
+  #
+  #   !supplied_cloudfront_origin_secret.empty? &&
+  #     ActiveSupport::SecurityUtils.secure_compare(
+  #       supplied_cloudfront_origin_secret,
+  #       expected_cloudfront_origin_secret
+  #     )
+  # end
+  #
+  # Both empty checks matter: Rails secure_compare('', '') is true because the
+  # implementation checks equal byte lengths and then compares the bytes:
+  # https://api.rubyonrails.org/classes/ActiveSupport/SecurityUtils.html#method-c-secure_compare
   #
   # Results then report `source_trust` as :host_verified instead of :unverified,
   # and `source_was_verified_by_host?` becomes true. Trackdown reports this; it
@@ -120,7 +143,11 @@ Trackdown.configure do |config|
   # your application's call.
   #
   # https://developers.cloudflare.com/ssl/origin-configuration/authenticated-origin-pull/
+  # https://developers.cloudflare.com/fundamentals/concepts/cloudflare-ip-addresses/#block-other-ip-addresses-recommended
+  # https://developers.cloudflare.com/fundamentals/reference/http-headers/#request-headers
+  # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/add-origin-custom-headers.html
   # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-overview.html
+  # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-origin-request-policies.html#managed-origin-request-policy-all-viewer-and-cloudfront
 
   # ========================================
   # General Options

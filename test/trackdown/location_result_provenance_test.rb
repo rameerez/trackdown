@@ -58,6 +58,26 @@ class LocationResultProvenanceTest < Minitest::Test
     refute_predicate Trackdown::LocationResult.unavailable(:address_not_found), :estimated?
   end
 
+  def test_a_partial_location_without_a_country_is_still_an_estimate
+    result = Trackdown::LocationResult.new(
+      nil, 'Unknown', 'Somewhere', '🏳️',
+      latitude: 1.0,
+      unavailable_reason: :provider_data_incomplete
+    )
+
+    assert_predicate result, :unavailable?
+    assert_predicate result, :estimated?
+  end
+
+  def test_a_tor_network_code_without_location_data_estimates_no_location
+    result = Trackdown::LocationResult.new(
+      'T1', 'Unknown', 'Unknown', '🏳️',
+      unavailable_reason: :provider_returned_unknown_country
+    )
+
+    refute_predicate result, :estimated?
+  end
+
   # === Accuracy ===
 
   def test_accuracy_radius_is_recorded_with_its_confidence
@@ -266,7 +286,7 @@ class LocationResultProvenanceTest < Minitest::Test
       database_build_epoch: 1_735_689_600,
       database_sha256: 'abc123'
     )
-    hash = result.to_h
+    hash = result.to_h(include_provenance: true)
 
     assert_equal :maxmind, hash[:provider_name]
     assert_equal :maxmind_local_database, hash[:provider_source]
@@ -282,20 +302,23 @@ class LocationResultProvenanceTest < Minitest::Test
   end
 
   def test_to_h_reports_unavailability
-    hash = Trackdown::LocationResult.unavailable(:no_provider_available).to_h
+    hash = Trackdown::LocationResult.unavailable(:no_provider_available).to_h(include_provenance: true)
 
     refute hash[:available]
     refute hash[:estimated]
     assert_equal :no_provider_available, hash[:unavailable_reason]
   end
 
-  def test_to_h_emits_every_documented_field_by_default
-    assert_equal Trackdown::LocationResult::DEFAULT_FIELDS, build.to_h.keys
+  def test_to_h_keeps_the_exact_pre_provenance_shape_by_default
+    assert_equal Trackdown::LocationResult::LEGACY_FIELDS, build.to_h.keys
+    assert_equal Trackdown::LocationResult::LEGACY_FIELDS, Trackdown::LocationResult::DEFAULT_FIELDS
   end
 
-  def test_the_digest_is_the_only_field_you_have_to_ask_for
+  def test_including_provenance_emits_every_field_except_the_expensive_digest
     assert_equal %i[database_sha256],
-                 Trackdown::LocationResult::FIELDS - Trackdown::LocationResult::DEFAULT_FIELDS
+                 Trackdown::LocationResult::FIELDS - Trackdown::LocationResult::FIELDS_WITHOUT_DATABASE_SHA256
+    assert_equal Trackdown::LocationResult::FIELDS_WITHOUT_DATABASE_SHA256,
+                 build.to_h(include_provenance: true).keys
   end
 
   def test_to_h_does_not_compute_the_digest_unless_you_name_it
@@ -387,6 +410,17 @@ class LocationResultProvenanceTest < Minitest::Test
     assert_equal Trackdown::LocationResult::DEFAULT_FIELDS - %i[country_info], hash.keys
   end
 
+  def test_to_h_can_include_provenance_without_country_info
+    hash = build('US', provider_name: :maxmind).to_h(
+      include_provenance: true,
+      include_country_info: false
+    )
+
+    assert_equal Trackdown::LocationResult::FIELDS_WITHOUT_DATABASE_SHA256 - %i[country_info], hash.keys
+    assert_equal :maxmind, hash[:provider_name]
+    refute_includes hash, :country_info
+  end
+
   def test_only_says_exactly_what_you_get_even_about_country_info
     hash = build.to_h(only: %i[country_code country_info], include_country_info: false)
 
@@ -430,6 +464,17 @@ class LocationResultProvenanceTest < Minitest::Test
     error = assert_raises(ArgumentError) { Trackdown::LocationResult.unavailable(nil) }
 
     assert_match(/has to say why/, error.message)
+  end
+
+  def test_unavailable_rejects_a_second_reason_hidden_in_provenance
+    error = assert_raises(ArgumentError) do
+      Trackdown::LocationResult.unavailable(
+        :address_not_found,
+        unavailable_reason: :no_provider_available
+      )
+    end
+
+    assert_match(/Pass the unavailable reason once/, error.message)
   end
 
   # === Backwards compatibility ===

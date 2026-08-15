@@ -57,13 +57,15 @@ module Trackdown
       POSTAL_CODE_HEADER = 'HTTP_CLOUDFRONT_VIEWER_POSTAL_CODE'
       METRO_CODE_HEADER = 'HTTP_CLOUDFRONT_VIEWER_METRO_CODE'
 
-      COUNTRY_CODE_PATTERN = /\A[A-Z]{2}\z/
+      COUNTRY_CODE_PATTERN = /\A[A-Za-z]{2}\z/
+      INDUSTRY_PRACTICE_COUNTRY_CODES = %w[XK].freeze
       INVALID_PERCENT_ESCAPE_PATTERN = /%(?![0-9A-Fa-f]{2})/
       PERCENT_ESCAPE_PATTERN = /%([0-9A-Fa-f]{2})/
       LATITUDE_RANGE = (-90.0..90.0)
       LONGITUDE_RANGE = (-180.0..180.0)
 
       private_constant :COUNTRY_CODE_PATTERN,
+                       :INDUSTRY_PRACTICE_COUNTRY_CODES,
                        :INVALID_PERCENT_ESCAPE_PATTERN,
                        :PERCENT_ESCAPE_PATTERN,
                        :LATITUDE_RANGE,
@@ -101,6 +103,8 @@ module Trackdown
           build_location_result(country_code, request, **provenance)
         end
 
+        private
+
         def build_location_result(country_code, request, **provenance)
           LocationResult.new(
             country_code,
@@ -119,8 +123,6 @@ module Trackdown
           )
         end
 
-        private
-
         # Derive the 2-letter continent code from the country code via the countries gem.
         # Returns nil for unknown countries or continents outside the table.
         def continent_code(country_code)
@@ -136,8 +138,16 @@ module Trackdown
           code = request.env[COUNTRY_HEADER]
           return nil unless code.is_a?(String)
 
+          return nil unless COUNTRY_CODE_PATTERN.match?(code)
+
           normalized_code = code.upcase
-          return nil unless COUNTRY_CODE_PATTERN.match?(normalized_code)
+
+          # Unicode CLDR gives XK (Kosovo) defined industry-practice semantics,
+          # while ZZ explicitly means an unknown or invalid territory. Preserve
+          # XK even though the countries gem's ISO catalog does not contain it;
+          # continue to reject arbitrary unassigned codes such as ZZ.
+          # https://www.unicode.org/reports/tr35/tr35-78/tr35.html#unicode_region_subtag_validity
+          return normalized_code if INDUSTRY_PRACTICE_COUNTRY_CODES.include?(normalized_code)
 
           country = ISO3166::Country.new(normalized_code)
           return nil unless country&.alpha2 == normalized_code
@@ -180,22 +190,6 @@ module Trackdown
           return nil unless decoded_value.valid_encoding?
 
           decoded_value
-        end
-
-        # CloudFront defines these fields as latitude/longitude. RFC 5870 defines
-        # valid WGS-84 latitude as -90..90 and longitude as -180..180, and Ruby's
-        # Float#finite? rejects overflow results such as Float("1e1000") => Infinity.
-        # AWS: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/adding-cloudfront-headers.html#cloudfront-headers-viewer-location
-        # RFC 5870: https://www.rfc-editor.org/rfc/rfc5870#section-3.4.2
-        # Ruby: https://docs.ruby-lang.org/en/3.3/Float.html#method-i-finite-3F
-        def parse_coordinate(value, range:)
-          return nil unless value.is_a?(String)
-          return nil if value.empty?
-
-          coordinate = Float(value, exception: false)
-          return nil unless coordinate&.finite? && range.cover?(coordinate)
-
-          coordinate
         end
       end
     end

@@ -39,6 +39,18 @@ class BaseProviderTest < Minitest::Test
     assert_equal '🏳️', flag
   end
 
+  def test_get_emoji_flag_returns_white_flag_for_a_non_country_pseudo_code
+    flag = Trackdown::Providers::BaseProvider.send(:get_emoji_flag, 'T1')
+
+    assert_equal '🏳️', flag
+  end
+
+  def test_get_emoji_flag_does_not_turn_unicode_case_expansion_into_a_country
+    flag = Trackdown::Providers::BaseProvider.send(:get_emoji_flag, 'ß')
+
+    assert_equal '🏳️', flag
+  end
+
   def test_get_country_name_returns_name_for_valid_code
     name = Trackdown::Providers::BaseProvider.send(:get_country_name, 'US')
     assert_equal 'United States of America', name

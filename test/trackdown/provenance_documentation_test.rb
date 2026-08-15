@@ -11,6 +11,17 @@ class ProvenanceDocumentationTest < Minitest::Test
     "https://developers.cloudflare.com/ssl/origin-configuration/authenticated-origin-pull/"
   CLOUDFRONT_ORIGIN_RESTRICTION_URL =
     "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-overview.html"
+  CLOUDFRONT_ALL_VIEWER_URL =
+    "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-origin-request-policies.html#managed-origin-request-policy-all-viewer-and-cloudfront"
+  CLOUDFLARE_REQUEST_HEADERS_URL =
+    "https://developers.cloudflare.com/fundamentals/reference/http-headers/#request-headers"
+  RAILS_SECURE_COMPARE_URL =
+    "https://api.rubyonrails.org/classes/ActiveSupport/SecurityUtils.html#method-c-secure_compare"
+  MAXMIND_MEMORY_READER_URL =
+    "https://github.com/maxmind/MaxMind-DB-Reader-ruby/blob/v1.2.0/lib/maxmind/db/memory_reader.rb#L7-L15"
+  MAXMIND_FILE_READER_URL =
+    "https://github.com/maxmind/MaxMind-DB-Reader-ruby/blob/v1.2.0/lib/maxmind/db/file_reader.rb#L36-L55"
+  RUBY_RENAME_URL = "https://docs.ruby-lang.org/en/3.3/File.html#method-c-rename"
 
   DOCUMENTED_RESULT_METHODS = %i[
     provider_name provider_source resolved_at estimated?
@@ -74,11 +85,22 @@ class ProvenanceDocumentationTest < Minitest::Test
   def test_the_readme_documents_the_trusted_cdn_path_verifier_and_its_limits
     readme = read("README.md")
 
-    assert_includes readme, 'verify_request_came_through_trusted_cdn_path_with'
+    assert_includes readme, 'verify_request_came_through_trusted_cloudflare_path_with'
+    assert_includes readme, 'verify_request_came_through_trusted_cloudfront_path_with'
     assert_includes readme, CLOUDFLARE_ORIGIN_PULL_URL
     assert_includes readme, CLOUDFRONT_ORIGIN_RESTRICTION_URL
+    assert_includes readme, CLOUDFLARE_REQUEST_HEADERS_URL
+    assert_includes readme, CLOUDFRONT_ALL_VIEWER_URL
     assert_match(/reports.{0,40}(trust state|this trust)/i, readme,
                  'the README must say Trackdown reports trust rather than acting on it')
+  end
+
+  def test_the_readme_shared_secret_example_rejects_missing_credentials
+    readme = read("README.md")
+
+    assert_includes readme, "raise 'Missing CloudFront origin secret'"
+    assert_includes readme, '!supplied_cloudfront_origin_secret.empty?'
+    assert_includes readme, RAILS_SECURE_COMPARE_URL
   end
 
   def test_the_readme_sources_the_accuracy_radius_confidence_to_maxmind
@@ -102,19 +124,37 @@ class ProvenanceDocumentationTest < Minitest::Test
     assert_includes changelog, 'available?'
   end
 
-  def test_the_changelog_warns_that_to_h_gained_keys
+  def test_the_changelog_and_readme_preserve_the_default_to_h_shape
     changelog = read("CHANGELOG.md")
+    readme = read("README.md")
 
-    assert_match(/to_h.{0,200}provenance/m, changelog)
+    assert_match(/no-argument `to_h` remains.{0,120}same 13 keys/m, changelog)
+    assert_includes changelog, 'include_provenance: true'
+    assert_match(/no-argument `to_h` is deliberately backward compatible/, readme)
+    assert_includes readme, 'result.to_h(include_provenance: true)'
+  end
+
+  def test_the_database_race_and_safe_update_are_documented_with_exact_sources
+    [read("README.md"), read("CHANGELOG.md")].each do |document|
+      assert_includes document, MAXMIND_MEMORY_READER_URL
+      assert_includes document, MAXMIND_FILE_READER_URL
+      assert_includes document, RUBY_RENAME_URL
+    end
   end
 
   def test_the_generated_initializer_explains_trusted_cdn_path_verification
     initializer = read("lib/generators/trackdown/templates/trackdown.rb")
 
-    assert_includes initializer, 'verify_request_came_through_trusted_cdn_path_with'
+    assert_includes initializer, 'verify_request_came_through_trusted_cloudflare_path_with'
+    assert_includes initializer, 'verify_request_came_through_trusted_cloudfront_path_with'
     assert_includes initializer, ':host_verified'
     assert_includes initializer, CLOUDFLARE_ORIGIN_PULL_URL
     assert_includes initializer, CLOUDFRONT_ORIGIN_RESTRICTION_URL
+    assert_includes initializer, CLOUDFLARE_REQUEST_HEADERS_URL
+    assert_includes initializer, CLOUDFRONT_ALL_VIEWER_URL
+    assert_includes initializer, "raise 'Missing CloudFront origin secret'"
+    assert_includes initializer, '!supplied_cloudfront_origin_secret.empty?'
+    assert_includes initializer, RAILS_SECURE_COMPARE_URL
   end
 
   def test_the_generated_initializer_is_valid_ruby

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'countries'
+require 'bigdecimal'
 
 require_relative '../location_result'
 
@@ -39,18 +40,25 @@ module Trackdown
       # the request. Trackdown never reads trust out of the headers themselves —
       # anyone who can reach an unprotected origin can send those.
       def self.request_provenance(request)
+        source_was_verified = Trackdown.configuration.request_came_through_trusted_cdn_path?(
+          request,
+          provider_name: provider_name
+        )
+
         {
           provider_name: provider_name,
           provider_source: provider_source,
-          source_trust: Trackdown.configuration.request_came_through_trusted_cdn_path?(request) ? :host_verified : :unverified
+          source_trust: source_was_verified ? :host_verified : :unverified
         }
       end
 
-      protected
-
       # Helper to get emoji flag from country code
       def self.get_emoji_flag(country_code)
-        country_code ? country_code.tr('A-Z', "\u{1F1E6}-\u{1F1FF}") : LocationResult::UNKNOWN_FLAG
+        return LocationResult::UNKNOWN_FLAG unless country_code.is_a?(String)
+        return LocationResult::UNKNOWN_FLAG unless /\A[A-Za-z]{2}\z/.match?(country_code)
+
+        normalized_code = country_code.upcase
+        normalized_code.tr('A-Z', "\u{1F1E6}-\u{1F1FF}")
       end
 
       # Helper to extract country name from country code using countries gem
@@ -61,6 +69,27 @@ module Trackdown
         country&.iso_short_name || country&.name || LocationResult::UNKNOWN
       rescue StandardError
         LocationResult::UNKNOWN
+      end
+
+      # Parse an untrusted decimal coordinate without allowing NaN, Infinity, or
+      # an out-of-range value through. BigDecimal accepts large exponents without
+      # Float's overflow warning; conversion to Float happens only after bounds.
+      # WGS-84 latitude/longitude bounds:
+      # https://www.rfc-editor.org/rfc/rfc5870#section-3.4.2
+      # Ruby BigDecimal:
+      # https://docs.ruby-lang.org/en/3.3/BigDecimal.html
+      def self.parse_coordinate(value, range:)
+        return nil unless value.is_a?(String)
+        return nil if value.empty?
+
+        coordinate = BigDecimal(value, exception: false)
+        return nil unless coordinate&.finite? && range.cover?(coordinate)
+
+        coordinate.to_f
+      end
+
+      class << self
+        protected :get_emoji_flag, :get_country_name, :parse_coordinate
       end
     end
   end

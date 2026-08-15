@@ -115,10 +115,10 @@ class CloudfrontProviderAdversarialTest < Minitest::Test
   end
 
   def test_rejects_every_non_finite_or_non_numeric_coordinate_spelling
-    # AWS defines these fields as geographic latitude/longitude values. Ruby documents
-    # Float#finite? as the check that excludes infinities produced by inputs such as 1e1000:
+    # AWS defines these fields as geographic latitude/longitude values. BigDecimal
+    # lets Trackdown reject huge exponents before converting them to Float:
     # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/adding-cloudfront-headers.html#cloudfront-headers-viewer-location
-    # https://docs.ruby-lang.org/en/3.3/Float.html#method-i-finite-3F
+    # https://docs.ruby-lang.org/en/3.3/BigDecimal.html
     ["NaN", "Infinity", "-Infinity", "1e1000", "-1e1000", "1.2.3", "37N", "", " "].each do |coordinate|
       request = mock_cloudfront_request(country: "US", latitude: coordinate, longitude: coordinate)
       result = Trackdown::Providers::CloudfrontProvider.locate("203.0.113.9", request: request)
@@ -308,7 +308,7 @@ class CloudfrontProviderAdversarialTest < Minitest::Test
   def test_invalid_country_headers_do_not_make_the_provider_available
     # AWS defines this value as an ISO 3166-1 alpha-2 country code:
     # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/adding-cloudfront-headers.html#cloudfront-headers-viewer-location
-    [" ", "USA", "ZZ", "1!"].each do |country_code|
+    [" ", "USA", "ZZ", "1!", "ß"].each do |country_code|
       request = mock_cloudfront_request(country: country_code)
 
       refute(

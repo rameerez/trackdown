@@ -128,6 +128,22 @@ class DatabaseFingerprintTest < Minitest::Test
     end
   end
 
+  def test_adding_reader_metadata_preserves_the_identity_captured_before_the_reader_opened
+    with_database_file('database generation A') do |path|
+      fingerprint_before_reader_open = Trackdown::DatabaseFingerprint.new(path: path)
+      replacement = "#{path}.new"
+      File.binwrite(replacement, 'database generation B')
+      File.rename(replacement, path)
+
+      reader_bound_fingerprint = fingerprint_before_reader_open.with_build_epoch(123)
+
+      assert_equal 123, reader_bound_fingerprint.build_epoch
+      assert_predicate reader_bound_fingerprint, :changed?
+      assert_nil reader_bound_fingerprint.sha256,
+                 'metadata from a reader opened after replacement must not make the old identity digest the new path'
+    end
+  end
+
   def test_refuses_to_digest_a_file_that_disappeared
     with_database_file do |path|
       fingerprint = fingerprint_for(path)

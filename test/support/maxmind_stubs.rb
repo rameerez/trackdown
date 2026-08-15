@@ -12,6 +12,20 @@ module TestHelpers
     BUILD_EPOCH = 1_735_689_600
 
     FakeMetadata = Struct.new(:build_epoch)
+    FakeDatabaseReader = Struct.new(:reader, :fingerprint, keyword_init: true)
+    FakeDatabaseLookup = Struct.new(:record, :fingerprint, keyword_init: true)
+
+    def self.database_reader_for(reader)
+      build_epoch = reader.metadata&.build_epoch
+      fingerprint = Trackdown::DatabaseFingerprint.new(
+        path: Trackdown.configuration.database_path,
+        build_epoch: build_epoch
+      )
+      FakeDatabaseReader.new(reader: reader, fingerprint: fingerprint)
+    rescue StandardError
+      fingerprint = Trackdown::DatabaseFingerprint.new(path: Trackdown.configuration.database_path)
+      FakeDatabaseReader.new(reader: reader, fingerprint: fingerprint)
+    end
 
     # Quacks like MaxMind::DB for the two things Trackdown asks of it.
     class FakeReader
@@ -49,10 +63,25 @@ module TestHelpers
 
       def initialize(reader)
         @reader = reader
+        @database_reader = MaxmindStubs.database_reader_for(reader)
       end
 
       def with
-        yield @reader
+        yield @database_reader
+      end
+    end
+
+    class FakeReaderSequencePool
+      def initialize(database_readers)
+        @database_readers = database_readers
+        @mutex = Mutex.new
+      end
+
+      def with
+        database_reader = @mutex.synchronize { @database_readers.shift }
+        raise 'No fake MaxMind reader left for this lookup' unless database_reader
+
+        yield database_reader
       end
     end
 
@@ -92,7 +121,15 @@ module TestHelpers
 
     # Hand MaxmindProvider an already-open pool, the way a real first lookup would.
     def open_maxmind_pool(pool)
-      Trackdown::Providers::MaxmindProvider.class_variable_set(:@@reader_pool, pool)
+      Trackdown::Providers::MaxmindProvider.instance_variable_set(:@reader_pool, pool)
+    end
+
+    # Unit tests that focus only on record mapping can stub the private database
+    # seam without inventing provenance. End-to-end provenance tests use the
+    # reader pool above and therefore always carry a real fingerprint.
+    def stub_maxmind_record(record)
+      lookup = FakeDatabaseLookup.new(record: record, fingerprint: nil)
+      Trackdown::Providers::MaxmindProvider.stub(:fetch_record, lookup) { yield }
     end
   end
 end
