@@ -12,6 +12,13 @@ on:
 
 jobs:
   claude-review:
+    # GitHub does not pass repository secrets to `pull_request` workflows from
+    # forks, so CLAUDE_CODE_OAUTH_TOKEN cannot exist in those runs. Skip this
+    # secret-dependent review job while still allowing the ordinary test workflow.
+    # Exact GitHub behavior:
+    # https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflows-in-forked-repositories
+    if: github.event.pull_request.head.repo.full_name == github.repository
+
     # Optional: Filter by PR author
     # if: |
     #   github.event.pull_request.user.login == 'external-contributor' ||
@@ -41,4 +48,3 @@ jobs:
           prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
-
