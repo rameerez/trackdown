@@ -3,8 +3,20 @@
 require "test_helper"
 
 class AutoProviderTest < Minitest::Test
+  def setup
+    super
+    reset_auto_provider_warnings
+  end
+
+  def teardown
+    reset_auto_provider_warnings
+    super
+  end
+
   def test_available_returns_true_when_cloudflare_available
-    request = mock_cloudflare_request
+    # Cloudflare states that CF-Connecting-IP is added on edge-to-origin traffic:
+    # https://developers.cloudflare.com/fundamentals/reference/http-headers/#cf-connecting-ip
+    request = mock_cloudflare_request_with_matching_ip(ip: '203.0.113.9')
 
     assert Trackdown::Providers::AutoProvider.available?(request: request)
   end
@@ -25,7 +37,7 @@ class AutoProviderTest < Minitest::Test
   end
 
   def test_locate_tries_cloudflare_first
-    request = mock_cloudflare_request(country: 'GB', city: 'London')
+    request = mock_cloudflare_request_with_matching_ip(ip: '1.2.3.4', country: 'GB', city: 'London')
     expected_result = Trackdown::LocationResult.new('GB', 'United Kingdom', 'London', '🇬🇧')
 
     # Cloudflare should be called
@@ -91,7 +103,7 @@ class AutoProviderTest < Minitest::Test
   end
 
   def test_cloudflare_takes_precedence_when_both_available
-    request = mock_cloudflare_request(country: 'FR', city: 'Paris')
+    request = mock_cloudflare_request_with_matching_ip(ip: '1.2.3.4', country: 'FR', city: 'Paris')
     cf_result = Trackdown::LocationResult.new('FR', 'France', 'Paris', '🇫🇷')
 
     Trackdown.configuration.database_path = '/fake/path.mmdb'
@@ -222,30 +234,42 @@ class AutoProviderTest < Minitest::Test
     end
   end
 
-  def test_uses_cloudflare_when_no_cf_connecting_ip_header
-    # If CF-Connecting-IP is not present, assume Cloudflare headers are valid
-    # (this is the legacy behavior for apps that don't have this header)
+  def test_missing_cf_connecting_ip_falls_back_to_maxmind
+    # Cloudflare documents CF-Connecting-IP as an edge-to-origin header. Without it,
+    # :auto cannot corroborate that viewer-supplied CF-* values describe the target IP:
+    # https://developers.cloudflare.com/fundamentals/reference/http-headers/#cf-connecting-ip
     request = mock_cloudflare_request(country: 'DE', city: 'Berlin')
-    cf_result = Trackdown::LocationResult.new('DE', 'Germany', 'Berlin', '🇩🇪')
+    maxmind_result = Trackdown::LocationResult.new('US', 'United States', 'Mountain View', '🇺🇸')
 
     Trackdown::Providers::CloudflareProvider.expects(:available?).with(request: request).returns(true)
-    Trackdown::Providers::CloudflareProvider.expects(:locate).with('8.8.8.8', request: request).returns(cf_result)
-    Trackdown::Providers::MaxmindProvider.expects(:locate).never
+    Trackdown::Providers::CloudflareProvider.expects(:locate).never
+    Trackdown::Providers::MaxmindProvider.expects(:available?).with(request: request).returns(true)
+    Trackdown::Providers::MaxmindProvider.expects(:locate)
+      .with('8.8.8.8', request: request)
+      .returns(maxmind_result)
 
-    result = Trackdown::Providers::AutoProvider.locate('8.8.8.8', request: request)
+    result = nil
+    _stdout, stderr = capture_io do
+      result = Trackdown::Providers::AutoProvider.locate('8.8.8.8', request: request)
+    end
 
-    assert_equal 'DE', result.country_code
+    assert_equal 'US', result.country_code
+    assert_includes stderr, 'CF-Connecting-IP is missing'
+    assert_includes stderr, 'trying the next available provider'
   end
 
   # --- CloudFront edge-header integration ---
 
   def test_available_true_with_cloudfront_headers
-    request = mock_cloudfront_request(country: 'US')
+    # The AWS managed policy includes CloudFront-Viewer-Address, which :auto uses
+    # to corroborate the target IP:
+    # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-origin-request-policies.html#managed-origin-request-policy-all-viewer-and-cloudfront
+    request = mock_cloudfront_request_with_matching_ip(ip: '203.0.113.9', country: 'US')
     assert Trackdown::Providers::AutoProvider.available?(request: request)
   end
 
   def test_uses_cloudfront_when_cloudflare_absent
-    request = mock_cloudfront_request(country: 'CA', city: 'Toronto')
+    request = mock_cloudfront_request_with_matching_ip(ip: '8.8.8.8', country: 'CA', city: 'Toronto')
     result = Trackdown::Providers::AutoProvider.locate('8.8.8.8', request: request)
 
     assert_equal 'CA', result.country_code
@@ -261,12 +285,16 @@ class AutoProviderTest < Minitest::Test
     assert_equal 'Denver', result.city
   end
 
-  def test_cloudflare_takes_precedence_over_cloudfront
-    # A request carrying both CDNs' headers should resolve via Cloudflare (higher priority)
+  def test_stacked_cdn_uses_cloudflare_when_only_cloudflare_matches_target_ip
+    # In a Cloudflare -> CloudFront stack, Cloudflare sees the viewer while CloudFront
+    # sees the Cloudflare edge. The provider whose corroborating IP matches the requested
+    # target is therefore the only safe candidate.
     request = Object.new
     env = {
       'HTTP_CF_IPCOUNTRY' => 'GB', 'HTTP_CF_IPCITY' => 'London',
-      'HTTP_CLOUDFRONT_VIEWER_COUNTRY' => 'US', 'HTTP_CLOUDFRONT_VIEWER_CITY' => 'New York'
+      'HTTP_CF_CONNECTING_IP' => '8.8.8.8',
+      'HTTP_CLOUDFRONT_VIEWER_COUNTRY' => 'US', 'HTTP_CLOUDFRONT_VIEWER_CITY' => 'New York',
+      'HTTP_CLOUDFRONT_VIEWER_ADDRESS' => '198.51.100.10:46532'
     }
     request.define_singleton_method(:env) { env }
 
@@ -297,5 +325,14 @@ class AutoProviderTest < Minitest::Test
       assert_equal 'IN', result.country_code
       assert_equal 'Mumbai', result.city
     end
+  end
+
+  private
+
+  def reset_auto_provider_warnings
+    provider = Trackdown::Providers::AutoProvider
+    provider.instance_variable_set(:@warned_ip_mismatch, false)
+    provider.instance_variable_set(:@warned_ambiguous_edge, false)
+    provider.instance_variable_set(:@warned_no_providers, false)
   end
 end

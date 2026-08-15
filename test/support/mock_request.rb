@@ -24,8 +24,8 @@ module TestHelpers
       request
     end
 
-    def mock_cloudflare_request_with_all_headers
-      mock_cloudflare_request(
+    def mock_cloudflare_request_with_all_headers(connecting_ip: nil)
+      request = mock_cloudflare_request(
         country: 'US',
         city: 'San Francisco',
         region: 'California',
@@ -37,6 +37,8 @@ module TestHelpers
         postal_code: '94107',
         metro_code: '807'
       )
+      request.env['HTTP_CF_CONNECTING_IP'] = connecting_ip if connecting_ip
+      request
     end
 
     def mock_request_without_cloudflare

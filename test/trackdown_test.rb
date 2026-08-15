@@ -141,7 +141,7 @@ class TrackdownTest < Minitest::Test
 
   def test_auto_provider_cloudflare_returns_new_fields
     Trackdown.configuration.provider = :auto
-    request = mock_cloudflare_request_with_all_headers
+    request = mock_cloudflare_request_with_all_headers(connecting_ip: '8.8.8.8')
 
     result = Trackdown.locate('8.8.8.8', request: request)
 

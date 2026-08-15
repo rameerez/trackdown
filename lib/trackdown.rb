@@ -28,7 +28,7 @@ module Trackdown
 
   # Locate an IP address using the configured provider
   # @param ip [String] The IP address to locate
-  # @param request [ActionDispatch::Request, nil] Optional Rails request object (required for Cloudflare provider)
+  # @param request [#env, nil] Optional Rack-compatible request object (required for CDN providers)
   # @return [LocationResult] The location information
   def self.locate(ip, request: nil)
     IpLocator.locate(ip, request: request)

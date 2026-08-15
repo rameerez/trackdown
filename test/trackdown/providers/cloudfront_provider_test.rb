@@ -172,10 +172,14 @@ class CloudfrontProviderTest < Minitest::Test
     end
   end
 
-  def test_continent_nil_for_unrecognized_country_code
+  def test_unrecognized_country_code_returns_unknown_location
     request = mock_cloudfront_request(country: 'ZZ')
     result = Trackdown::Providers::CloudfrontProvider.locate('8.8.8.8', request: request)
 
+    assert_nil result.country_code
+    assert_equal 'Unknown', result.country_name
+    assert_equal 'Unknown', result.city
+    assert_equal '🏳️', result.flag_emoji
     assert_nil result.continent
   end
 
