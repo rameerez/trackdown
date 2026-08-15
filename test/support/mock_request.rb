@@ -2,6 +2,23 @@
 
 module TestHelpers
   module MockRequest
+    # A bare Rack-ish request carrying exactly the env you hand it.
+    def mock_request(env = {})
+      request = Object.new
+      request.define_singleton_method(:env) { env }
+      request
+    end
+
+    # Teach Trackdown how this host proves a request really came through its CDN.
+    def verify_trusted_cdn_path_with_header(provider_name: :cloudflare,
+                                            name: 'HTTP_X_ORIGIN_SECRET', value: 'shared-secret')
+      Trackdown.configure do |config|
+        config.verify_request_came_through_trusted_cdn_path_with(provider_name) do |request|
+          request.env[name] == value
+        end
+      end
+    end
+
     def mock_cloudflare_request(country: 'US', city: 'San Francisco',
                                 region: nil, region_code: nil,
                                 latitude: nil, longitude: nil,
@@ -68,7 +85,7 @@ module TestHelpers
       request
     end
 
-    def mock_cloudfront_request_with_all_headers
+    def mock_cloudfront_request_with_all_headers(viewer_address: nil)
       mock_cloudfront_request(
         country: 'US',
         city: 'San Francisco',
@@ -78,7 +95,8 @@ module TestHelpers
         longitude: '-122.4194',
         timezone: 'America/Los_Angeles',
         postal_code: '94107',
-        metro_code: '807'
+        metro_code: '807',
+        viewer_address: viewer_address
       )
     end
 
@@ -155,7 +173,8 @@ module TestHelpers
           'latitude' => 37.7749,
           'longitude' => -122.4194,
           'time_zone' => 'America/Los_Angeles',
-          'metro_code' => 807
+          'metro_code' => 807,
+          'accuracy_radius' => 20
         },
         'postal' => {
           'code' => '94107'

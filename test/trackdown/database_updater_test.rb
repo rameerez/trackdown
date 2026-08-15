@@ -98,6 +98,40 @@ class DatabaseUpdaterTest < Minitest::Test
     Trackdown::DatabaseUpdater.update
 
     assert File.exist?(Trackdown.configuration.database_path)
+    assert_equal 'fake mmdb content', File.binread(Trackdown.configuration.database_path)
+  end
+
+  def test_update_replaces_the_path_without_truncating_an_open_reader
+    # MODE_FILE readers retain an open file just like this handle:
+    # https://github.com/maxmind/MaxMind-DB-Reader-ruby/blob/v1.2.0/lib/maxmind/db/file_reader.rb#L36-L55
+    # Trackdown installs with one same-directory rename:
+    # https://docs.ruby-lang.org/en/3.3/File.html#method-c-rename
+    File.binwrite(Trackdown.configuration.database_path, 'working database')
+    open_reader = File.open(Trackdown.configuration.database_path, 'rb')
+    stub_request(:get, /download.maxmind.com/)
+      .to_return(body: create_fake_targz, status: 200)
+
+    Trackdown::DatabaseUpdater.update
+
+    assert_equal 'fake mmdb content', File.binread(Trackdown.configuration.database_path)
+    assert_equal 'working database', open_reader.read
+  ensure
+    open_reader&.close
+  end
+
+  def test_update_keeps_the_working_database_when_the_archive_has_no_database
+    File.binwrite(Trackdown.configuration.database_path, 'working database')
+    url = /download.maxmind.com/
+
+    stub_request(:get, url)
+      .to_return(body: create_fake_targz(include_database: false), status: 200)
+
+    error = assert_raises(Trackdown::Error) do
+      Trackdown::DatabaseUpdater.update
+    end
+
+    assert_match(/did not contain a .mmdb database/, error.message)
+    assert_equal 'working database', File.binread(Trackdown.configuration.database_path)
   end
 
   def test_update_raises_error_on_other_http_errors
@@ -129,7 +163,7 @@ class DatabaseUpdaterTest < Minitest::Test
   private
 
   # Helper to create a minimal valid tar.gz file with a .mmdb file
-  def create_fake_targz
+  def create_fake_targz(include_database: true)
     require 'stringio'
     require 'zlib'
     require 'rubygems/package'
@@ -137,9 +171,15 @@ class DatabaseUpdaterTest < Minitest::Test
     tar_io = StringIO.new
 
     Gem::Package::TarWriter.new(tar_io) do |tar|
-      # Add a fake .mmdb file
-      tar.add_file('GeoLite2-City_20240101/GeoLite2-City.mmdb', 0644) do |io|
-        io.write('fake mmdb content')
+      if include_database
+        # Add a fake .mmdb file
+        tar.add_file('GeoLite2-City_20240101/GeoLite2-City.mmdb', 0644) do |io|
+          io.write('fake mmdb content')
+        end
+      else
+        tar.add_file('GeoLite2-City_20240101/COPYRIGHT.txt', 0644) do |io|
+          io.write('not a database')
+        end
       end
     end
 

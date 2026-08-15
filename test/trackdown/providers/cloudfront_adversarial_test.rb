@@ -115,11 +115,12 @@ class CloudfrontProviderAdversarialTest < Minitest::Test
   end
 
   def test_rejects_every_non_finite_or_non_numeric_coordinate_spelling
-    # AWS defines these fields as geographic latitude/longitude values. Ruby documents
-    # Float#finite? as the check that excludes infinities produced by inputs such as 1e1000:
+    # AWS defines these fields as geographic latitude/longitude values, so anything
+    # that isn't a plain decimal is rejected before it is ever converted — huge
+    # exponents and hexadecimal included. Kernel#Float would read "0x10" as a
+    # perfectly valid latitude of 16.0.
     # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/adding-cloudfront-headers.html#cloudfront-headers-viewer-location
-    # https://docs.ruby-lang.org/en/3.3/Float.html#method-i-finite-3F
-    ["NaN", "Infinity", "-Infinity", "1e1000", "-1e1000", "1.2.3", "37N", "", " "].each do |coordinate|
+    ["NaN", "Infinity", "-Infinity", "1e1000", "-1e1000", "1.2.3", "37N", "", " ", "0x10", "1_0.5"].each do |coordinate|
       request = mock_cloudfront_request(country: "US", latitude: coordinate, longitude: coordinate)
       result = Trackdown::Providers::CloudfrontProvider.locate("203.0.113.9", request: request)
 
@@ -308,7 +309,7 @@ class CloudfrontProviderAdversarialTest < Minitest::Test
   def test_invalid_country_headers_do_not_make_the_provider_available
     # AWS defines this value as an ISO 3166-1 alpha-2 country code:
     # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/adding-cloudfront-headers.html#cloudfront-headers-viewer-location
-    [" ", "USA", "ZZ", "1!"].each do |country_code|
+    [" ", "USA", "ZZ", "1!", "ß"].each do |country_code|
       request = mock_cloudfront_request(country: country_code)
 
       refute(
@@ -705,11 +706,4 @@ class CloudfrontAutoProviderAdversarialTest < Minitest::Test
   end
 
   private
-
-  def reset_auto_provider_warnings
-    provider = Trackdown::Providers::AutoProvider
-    provider.instance_variable_set(:@warned_ip_mismatch, false)
-    provider.instance_variable_set(:@warned_ambiguous_edge, false)
-    provider.instance_variable_set(:@warned_no_providers, false)
-  end
 end

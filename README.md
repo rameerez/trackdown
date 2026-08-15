@@ -22,6 +22,8 @@ Given an IP, it gives you the corresponding:
 - 📺 Metro code (e.g. "807")
 - 🇺🇸 Emoji flag of the country
 
+And, because a location you can't explain isn't much of a location, every result also tells you [how it knows](#how-do-you-know): which provider answered, when, how precise that provider says it is, whether you vouched for the request it came from, and — when there's no answer — exactly why.
+
 ## First, choose your `trackdown` Geo IP provider
 
 ### Option 1: Cloudflare (recommended for Cloudflare origins)
@@ -73,7 +75,7 @@ By default, `trackdown` uses **`:auto` mode**. It uses an edge provider only whe
 
 ## Installation
 
-Add this line to your application's Gemfile:
+`trackdown` needs Ruby 3.1 or newer. Add this line to your application's Gemfile:
 
 ```ruby
 gem 'trackdown'
@@ -102,7 +104,7 @@ If your app is behind Cloudflare, setup is super simple:
 ```ruby
 # In your controller
 Trackdown.locate(request.remote_ip, request: request).country
-# => 'United States'
+# => 'United States of America'
 ```
 
 ### Setup with Amazon CloudFront
@@ -200,7 +202,7 @@ production:
 # In your controller - pass the request object
 result = Trackdown.locate(request.remote_ip, request: request)
 result.country
-# => 'United States'
+# => 'United States of America'
 ```
 
 In `:auto`, `request.remote_ip` must represent the same viewer that the CDN's corroborating IP header represents. If your Rails proxy configuration deliberately produces a different IP, use MaxMind for that target or explicitly select the correctly configured CDN provider.
@@ -228,7 +230,7 @@ In fact, there are a few methods you can use:
 
 ```ruby
 result.country_code    # => 'US'
-result.country_name    # => 'United States'
+result.country_name    # => 'United States' (MaxMind's own name for it)
 result.country         # => 'United States' (alias for country_name)
 result.city            # => 'Mountain View' (from MaxMind or configured CDN headers)
 result.region          # => 'California'
@@ -244,6 +246,19 @@ result.emoji           # => '🇺🇸' (alias for flag_emoji)
 result.country_flag    # => '🇺🇸' (alias for flag_emoji)
 result.country_info    # => # Rich country data from the `countries` gem
 ```
+
+`country_name` comes from MaxMind's own record on the MaxMind path, and from the [`countries` gem](https://github.com/countries/countries) on the Cloudflare and CloudFront paths — so the same country can read `'United States'` or `'United States of America'` depending on who answered. `country_code` is the one to compare against.
+
+And the same result will tell you where all of that came from:
+
+```ruby
+result.available?      # => true (did we actually resolve a location?)
+result.provider_name   # => :maxmind
+result.provider        # => :maxmind (alias for provider_name)
+result.resolved_at     # => 2026-08-15 04:22:47 UTC
+```
+
+There's [a whole section on that](#how-do-you-know) below.
 
 > [!NOTE]
 > The optional fields require Cloudflare's ["Add visitor location headers"](https://developers.cloudflare.com/rules/transform/managed-transforms/reference/), an applicable CloudFront origin request policy, or a MaxMind GeoLite2-City database. AWS notes that city, metro, and postal data may be unavailable and that extended CloudFront location headers are omitted for viewers on AWS networks: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/adding-cloudfront-headers.html#cloudfront-headers-viewer-location. Unavailable fields return `nil` (`city` uses `'Unknown'`).
@@ -262,7 +277,8 @@ result.country_info.iso_long_name   # => 'The United States of America'
 
 ### Hash data
 
-If you prefer, you can also get all the information as a hash:
+If you prefer a hash, the no-argument form keeps Trackdown's original 13-key
+shape exactly:
 
 ```ruby
 result.to_h
@@ -282,6 +298,267 @@ result.to_h
 #      country_info: { ... }
 #    }
 ```
+
+Ask for provenance when you want the provenance-rich shape:
+
+```ruby
+result.to_h(include_provenance: true)
+# => {
+#      country_code: 'US',
+#      country_name: 'United States',
+#      city: 'Mountain View',
+#      flag_emoji: '🇺🇸',
+#      region: 'California',
+#      region_code: 'CA',
+#      continent: 'NA',
+#      timezone: 'America/Los_Angeles',
+#      latitude: 37.7749,
+#      longitude: -122.4194,
+#      postal_code: '94107',
+#      metro_code: '807',
+#      provider_name: :maxmind,
+#      provider_source: :maxmind_local_database,
+#      source_trust: nil,
+#      resolved_at: 2026-08-15 04:22:47 UTC,
+#      available: true,
+#      estimated: true,
+#      unavailable_reason: nil,
+#      accuracy_radius_in_kilometers: 20,
+#      accuracy_radius_confidence_percentage: 67,
+#      database_build_epoch: 1735689600,
+#      database_built_at: 2025-01-01 00:00:00 UTC,
+#      country_info: { ... }
+#    }
+```
+
+Or just the fields you actually want to keep, named in plain English, in the order you name them:
+
+```ruby
+result.to_h(only: %i[country_code city latitude longitude accuracy_radius_in_kilometers provider_name])
+# => { country_code: 'US', city: 'Mountain View', latitude: 37.7749,
+#      longitude: -122.4194, accuracy_radius_in_kilometers: 20, provider_name: :maxmind }
+```
+
+`country_info` is a large derived payload, so you can also just leave it out:
+
+```ruby
+result.to_h(include_country_info: false)
+```
+
+What you name is what you get, in that order — naming a field that doesn't exist raises, and nothing you name is ever dropped, so a typo can't quietly cost you a column in something you're storing.
+
+> [!NOTE]
+> The no-argument `to_h` is deliberately backward compatible: same keys, same order, same values. `include_provenance: true` opts into every provenance field except `database_sha256`; a digest can require reading the whole database file, so Trackdown never hides that I/O inside ordinary serialization. Ask for the digest explicitly with `only:` — [see below](#which-database-said-so).
+
+## How do you know?
+
+Geolocating an IP is a guess. A good one, but a guess — and if you're using it for fraud checks, abuse reports, audit trails, or anything you might one day have to explain, the guess is only half of what you need. You also need to know *how it was made*.
+
+So every result carries its own provenance. Nothing here is guessed: every field is either what the provider said, or something derived from it by a rule this README documents. A field the answering provider can't supply is `nil`, never a plausible-looking placeholder.
+
+### Which provider answered, and when
+
+```ruby
+result.provider_name    # => :cloudflare, :cloudfront, or :maxmind
+result.provider_source  # => :cloudflare_request_headers, :cloudfront_request_headers, or :maxmind_local_database
+result.resolved_at      # => 2026-08-15 04:22:47 UTC
+result.estimated?       # => true
+```
+
+`provider_name` uses the very same symbols you'd set as `config.provider`, so `result.provider_name == :cloudflare` reads exactly like the config that produced it. In `:auto` mode you get the provider that actually won, after every fallback — if Cloudflare was skipped and MaxMind answered, the result says `:maxmind`.
+
+`estimated?` is `true` whenever the provider returned any location estimate. That
+includes a partial result with a city or coordinates but no country, even though
+that same result is `unavailable?`. It is `false` when nothing spatial was
+resolved—for example, a bare Cloudflare `T1` Tor marker. `available?` answers
+"could we name a country?"; `estimated?` answers "did the provider return any
+inferred location?" Those are intentionally independent questions.
+
+GeoIP never proves that a person or device was at a location. MaxMind explicitly
+says its data cannot identify a specific household, individual, or street address
+and may locate a VPN or server rather than its end user:
+https://support.maxmind.com/knowledge-base/articles/maxmind-geolocation-accuracy
+
+### Did we actually find anything?
+
+```ruby
+result.available?          # => false
+result.unavailable?        # => true
+result.unavailable_reason  # => :address_not_found
+```
+
+The reasons are stable symbols, part of the public API, and never translated:
+
+| Reason | What happened |
+|---|---|
+| `:no_provider_available` | No usable CDN header result and no MaxMind database. Nobody could answer. |
+| `:address_not_found` | We searched a real database and this address simply isn't in it. |
+| `:provider_returned_unknown_country` | The CDN answered, but with no country — Cloudflare's `XX`, Unicode's unknown/invalid `ZZ`, or `T1` for a visitor arriving over Tor. |
+| `:provider_data_incomplete` | A provider returned a record, but not enough of one to name a country. |
+
+`unavailable?` means precisely *"we could not name a country"*. Some of those results still carry something useful — a Tor result keeps `country_code == 'T1'`, and an incomplete database record can still have a city and coordinates. If those are worth having to you, read them; Trackdown hands back everything it got either way.
+
+> [!NOTE]
+> `country_name` and `city` still return the display string `'Unknown'` when a provider has no value, exactly as they always have — existing code keeps working. New code should branch on `available?` / `unavailable_reason` rather than comparing against a display string.
+
+### How precise is it?
+
+MaxMind's City records carry an accuracy radius, and Trackdown passes it straight through:
+
+```ruby
+result.accuracy_radius_in_kilometers          # => 20
+result.accuracy_radius_km                     # => 20 (alias)
+result.accuracy_radius_confidence_percentage  # => 67
+```
+
+That reads: *the address is within 20 km of these coordinates, with 67% confidence* — [MaxMind's own definition](https://support.maxmind.com/knowledge-base/articles/maxmind-geolocation-accuracy). Neither Cloudflare's [exact visitor-location field list](https://developers.cloudflare.com/rules/transform/managed-transforms/reference/#add-visitor-location-headers) nor CloudFront's [exact viewer-location header list](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/adding-cloudfront-headers.html#cloudfront-headers-viewer-location) publishes an accuracy figure, so those results return `nil` instead of an invented one.
+
+### Which database said so?
+
+```ruby
+result.database_build_epoch  # => 1735689600
+result.database_built_at     # => 2025-01-01 00:00:00 UTC
+result.database_sha256       # => '4f8b42c22dd3729b519ba6f68d2da7cc…'
+```
+
+The build epoch comes from the exact answering reader's database metadata; the
+MaxMind DB format defines it as the database build timestamp in Unix-epoch form:
+https://maxmind.github.io/MaxMind-DB/#build_epoch. In a serialized hash it is
+included only when you ask for provenance or name it with `only:`.
+
+The digest is lazy because it costs a full read of the database file. Trackdown
+computes it the first time someone asks and shares that lazy fingerprint among
+pooled readers bound to the same path, file identity, and build epoch. Ordinary
+lookups and ordinary `to_h` calls never compute it. When you want it, name it:
+
+```ruby
+result.database_sha256                       # the reader
+result.to_h(only: %i[database_sha256])       # or in a hash
+```
+
+Every result retains the fingerprint of the exact reader that answered it. That
+matters because the MaxMind Ruby reader can either copy the file into memory when
+opened or retain an open file handle, depending on mode:
+https://github.com/maxmind/MaxMind-DB-Reader-ruby/blob/v1.2.0/lib/maxmind/db/memory_reader.rb#L7-L15
+and
+https://github.com/maxmind/MaxMind-DB-Reader-ruby/blob/v1.2.0/lib/maxmind/db/file_reader.rb#L36-L55.
+If the configured path is replaced after an older reader opened it, the older
+result keeps that reader's build epoch and its digest becomes `nil`; it never
+borrows the replacement file's digest. A new reader receives a new fingerprint.
+
+`Trackdown.update_database` writes the complete download to a temporary file in
+the destination directory, flushes it, and replaces the configured path with one
+`File.rename` only after the archive contains a `.mmdb` file. That prevents
+Trackdown's updater from truncating a database underneath a `MODE_FILE` reader.
+Ruby's rename contract is documented at
+https://docs.ruby-lang.org/en/3.3/File.html#method-c-rename, and the reader's
+open-file behavior is visible in the exact source linked above.
+
+> [!NOTE]
+> `Trackdown.update_database` drops the cached reader pool in the process that ran it, so that process's next lookup opens the new database. If you refresh from a separate process — a cron job or a `rails runner`, as the scheduling section recommends — your web workers keep serving the database they already have open until they restart. Call `Trackdown::Providers::MaxmindProvider.reset_database!` in a worker to make its next lookup pick up the new file without a restart.
+
+### Did the request really come through your CDN?
+
+Here's the uncomfortable part. `CF-IPCountry` is just a header. Anyone who can reach your origin directly can send you one, and it will look exactly like the real thing. Matching `CF-Connecting-IP` against the IP you're asking about — which `:auto` already does — is useful corroboration, but it is *not* proof that the request came through Cloudflare.
+
+Only your own origin protection can vouch for the request path. Cloudflare and
+CloudFront are configured independently: a verified path through one CDN must
+never authenticate the other CDN's headers.
+
+For Cloudflare, have the layer that actually validates Authenticated Origin Pulls
+or the Cloudflare peer network place a non-viewer-controlled boolean in the Rack
+environment, then read that boolean:
+
+```ruby
+Trackdown.configure do |config|
+  config.verify_request_came_through_trusted_cloudflare_path_with do |request|
+    request.env['my_app.cloudflare_origin_was_verified'] == true
+  end
+end
+```
+
+For a CloudFront custom origin header, compare the CloudFront-only secret and
+refuse to boot if the expected value is blank:
+
+```ruby
+expected_cloudfront_origin_secret =
+  Rails.application.credentials.dig(:cloudfront, :origin_secret).to_s
+raise 'Missing CloudFront origin secret' if expected_cloudfront_origin_secret.empty?
+
+Trackdown.configure do |config|
+  config.verify_request_came_through_trusted_cloudfront_path_with do |request|
+    supplied_cloudfront_origin_secret =
+      request.env['HTTP_X_CLOUDFRONT_ORIGIN_SECRET'].to_s
+
+    !supplied_cloudfront_origin_secret.empty? &&
+      ActiveSupport::SecurityUtils.secure_compare(
+        supplied_cloudfront_origin_secret,
+        expected_cloudfront_origin_secret
+      )
+  end
+end
+```
+
+Both non-empty checks matter. Rails implements `secure_compare` as an equal-byte-
+length check followed by a fixed-length comparison, so two empty strings compare
+equal:
+https://api.rubyonrails.org/classes/ActiveSupport/SecurityUtils.html#method-c-secure_compare
+
+```ruby
+result.source_trust                  # => :host_verified (or :unverified)
+result.source_was_verified_by_host?  # => true
+result.host_verified?                # => true (alias)
+```
+
+Without that callback, a request-backed result is always `:unverified` — no matter how complete or how corroborated its headers are. Header presence alone can never produce `:host_verified`. MaxMind results have no request path to verify at all, so their `source_trust` is `nil`.
+
+What you put in each callback is whatever that deployment path actually proves:
+
+- **Cloudflare:** [Authenticated Origin Pulls](https://developers.cloudflare.com/ssl/origin-configuration/authenticated-origin-pull/), or [blocking every IP that isn't Cloudflare's](https://developers.cloudflare.com/fundamentals/concepts/cloudflare-ip-addresses/#block-other-ip-addresses-recommended).
+- **CloudFront:** [an origin custom header CloudFront adds and viewers can't](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/add-origin-custom-headers.html), plus [restricting the custom origin](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-overview.html).
+
+The separation is security-relevant. Cloudflare documents that it passes ordinary
+viewer request headers to the origin:
+https://developers.cloudflare.com/fundamentals/reference/http-headers/#request-headers.
+AWS documents that `AllViewerAndCloudFrontHeaders-2022-06` forwards all viewer
+headers:
+https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-origin-request-policies.html#managed-origin-request-policy-all-viewer-and-cloudfront.
+Therefore a trusted CloudFront path cannot vouch for a forwarded `CF-*` family,
+and a trusted Cloudflare path cannot vouch for a forwarded `CloudFront-*` family.
+
+> [!IMPORTANT]
+> Trackdown **reports** this trust state. It doesn't act on it — an unverified location is still returned in full. Whether an unverified location is good enough to ban an account, or only good enough to show a flag in the UI, is your application's call, not a gem's.
+
+### Putting it together
+
+Act on the strength of the evidence, not just on the answer:
+
+```ruby
+location = Trackdown.locate(request.remote_ip, request: request)
+
+if location.available? && location.host_verified?
+  enforce_geoblock!(location.country_code)   # evidence you'd be willing to defend
+elsif location.available?
+  flag_for_review(location.country_code)     # good enough to look at, not to act on
+end
+```
+
+And when you store it, store how you got it:
+
+```ruby
+AbuseReport.create!(
+  ip: request.remote_ip,
+  **location.to_h(only: %i[
+    country_code city latitude longitude accuracy_radius_in_kilometers
+    provider_name provider_source source_trust resolved_at database_built_at
+  ])
+)
+```
+
+The names you can pass to `only:` are `Trackdown::LocationResult::FIELDS`. Three
+ready-made slices come with it: `LOCATION_FIELDS` (where the IP is),
+`PROVENANCE_FIELDS` (how we know), and `DEFAULT_FIELDS` (exactly what a
+no-argument `to_h` returns, `country_info` included).
 
 ## Configuration
 
@@ -318,6 +595,9 @@ Trackdown.configure do |config|
 
   # General
   config.reject_private_ips = true  # Reject 192.168.x.x, 127.0.0.1, etc.
+
+  # Optional provider-specific source-trust callbacks are documented, with
+  # fail-closed examples, in "Did the request really come through your CDN?"
 end
 ```
 
@@ -348,7 +628,22 @@ When you enable "IP Geolocation" in Cloudflare, they add the `CF-IPCountry` head
 | `cf-postal-code` | `postal_code` |
 | `cf-timezone` | `timezone` |
 
-Trackdown reads these headers directly from the request with zero overhead — no database lookups, no external API calls.
+Trackdown reads these headers directly from the request—no database lookup or
+external API call. It rejects non-finite or out-of-range coordinates using the
+same WGS-84 bounds as the CloudFront provider. Exact Cloudflare field source:
+https://developers.cloudflare.com/rules/transform/managed-transforms/reference/#add-visitor-location-headers.
+Exact coordinate bounds:
+https://www.rfc-editor.org/rfc/rfc5870#section-3.4.2.
+
+Cloudflare's `XX` and `T1` values are not countries. Trackdown preserves `T1`
+as useful Tor provenance but reports the location unavailable and renders the
+white unknown flag rather than a malformed regional-indicator glyph. Unicode's
+`ZZ` unknown/invalid territory is unavailable too. Non-string or malformed
+optional values, and non-string, invalidly encoded, or malformed country values,
+are ignored rather than allowed to raise from a lookup. Exact Cloudflare code contract:
+https://developers.cloudflare.com/fundamentals/reference/http-headers/#cf-ipcountry.
+Exact Unicode `ZZ` semantics:
+https://www.unicode.org/reports/tr35/tr35-78/tr35.html#unicode_region_subtag_validity.
 
 ### CloudFront Provider
 
@@ -371,7 +666,7 @@ https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/adding-cloudf
 
 Important details from that contract:
 
-- `CloudFront-Viewer-Country` is validated as an assigned ISO 3166-1 alpha-2 code before CloudFront is considered available.
+- `CloudFront-Viewer-Country` is validated against the `countries` catalog before CloudFront is considered available, with one deliberate exception: `XK` is preserved for Kosovo. Unicode CLDR documents `XK` as established industry practice and `ZZ` as unknown/invalid territory: https://www.unicode.org/reports/tr35/tr35-78/tr35.html#unicode_region_subtag_validity.
 - Non-ASCII viewer-location values are RFC 3986 percent-encoded by CloudFront. Trackdown decodes them as UTF-8 without applying HTML form `+`-as-space behavior. RFC source: https://www.rfc-editor.org/rfc/rfc3986#section-2.1.
 - Latitude and longitude are accepted only when finite and inside the WGS-84 bounds of `-90..90` and `-180..180`. Bounds source: https://www.rfc-editor.org/rfc/rfc5870#section-3.4.2.
 - City, metro code, and postal code may be unavailable. Extended headers are omitted for viewer IPs on the AWS network.
@@ -388,7 +683,7 @@ https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-conte
 
 ### MaxMind Provider
 
-Downloads the [GeoLite2-City](https://dev.maxmind.com/geoip/docs/databases/city-and-country/) database to your server and performs local lookups using connection pooling for performance. All fields (`country`, `city`, `region`, `continent`, `timezone`, `latitude`, `longitude`, `postal_code`, `metro_code`) are extracted from the database record.
+Downloads the [GeoLite2-City](https://dev.maxmind.com/geoip/docs/databases/city-and-country/) database to your server and performs local lookups using connection pooling for performance. All fields (`country`, `city`, `region`, `continent`, `timezone`, `latitude`, `longitude`, `postal_code`, `metro_code`) are extracted from the database record, along with the record's [`accuracy_radius`](https://dev.maxmind.com/geoip/docs/databases/city-and-country/city-binary/) and the identity of the database that answered — see [How do you know?](#how-do-you-know).
 
 
 ## Docker & Container Deployments

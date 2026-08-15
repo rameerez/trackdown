@@ -19,7 +19,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ruby_version: ["3.3", "3.4", "4.0"]
+        # 3.2 is the oldest Ruby the test toolchain runs on (minitest 6 requires it).
+        # The gem itself supports 3.1; the packaged-gem job below is what proves it.
+        ruby_version: ["3.2", "3.3", "3.4", "4.0"]
 
     env:
       RAILS_ENV: test
@@ -44,3 +46,39 @@ jobs:
           name: test-results-ruby-${{ matrix.ruby_version }}
           path: test/reports/
           retention-days: 7
+
+  # Build the gem, install it the way an application would, and drive its public
+  # API with nothing but its declared dependencies available. This is what catches
+  # a require that only works because the development bundle happens to have it,
+  # and it covers the oldest Ruby the gemspec supports.
+  packaged_gem:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby_version: ["3.1", "4.0"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby ${{ matrix.ruby_version }}
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby_version }}
+
+      - name: Build and install the gem in isolation
+        run: |
+          gem build trackdown.gemspec -o trackdown.gem
+          gem install --install-dir "$PWD/isolated-gems" --no-document trackdown.gem
+
+      - name: Exercise the installed gem
+        env:
+          GEM_HOME: ${{ github.workspace }}/isolated-gems
+          GEM_PATH: ${{ github.workspace }}/isolated-gems
+          # No Bundler in the picture: the point is what an application gets from
+          # the gemspec alone, not what this repository's Gemfile happens to load.
+          RUBYOPT: ""
+          BUNDLE_GEMFILE: ""
+        run: ruby test/smoke/packaged_gem.rb
