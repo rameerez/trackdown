@@ -1,3 +1,13 @@
+## [Unreleased]
+
+- Add an **Amazon CloudFront** provider (`:cloudfront`) that reads country, city, region, timezone, coordinates, postal code, and metro code from `CloudFront-Viewer-*` request headers without adding runtime dependencies. Exact AWS header contract: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/adding-cloudfront-headers.html#cloudfront-headers-viewer-location
+- Validate CloudFront countries against assigned ISO 3166-1 alpha-2 records, decode AWS's RFC 3986 percent-encoded UTF-8 location values, reject malformed encoding, and reject non-finite or out-of-range WGS-84 coordinates. Encoding source: https://www.rfc-editor.org/rfc/rfc3986#section-2.1. Coordinate source: https://www.rfc-editor.org/rfc/rfc5870#section-3.4.2
+- Derive `continent` from the validated country via the existing `countries` dependency and normalize it to the same two-letter code (`NA`, `EU`, …) returned by other providers.
+- Make `:auto` require the target IP to match `CF-Connecting-IP` or `CloudFront-Viewer-Address`; missing, malformed, and mismatching corroborators fall through to the next provider. Cloudflare source: https://developers.cloudflare.com/fundamentals/reference/http-headers/#cf-connecting-ip. CloudFront source: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/adding-cloudfront-headers.html#cloudfront-headers-viewer-location
+- Make `:auto` fail closed when both CDN candidates match: try MaxMind and otherwise return `Unknown`. AWS documents that `AllViewerAndCloudFrontHeaders-2022-06` forwards every viewer header, so header presence cannot safely resolve that ambiguity: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-origin-request-policies.html#managed-origin-request-policy-all-viewer-and-cloudfront
+- Document the required CloudFront origin trust boundary. AWS recommends requiring a CloudFront-added custom header at custom origins to prevent direct bypass: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/add-origin-custom-headers.html and https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-overview.html
+- Document the equivalent Cloudflare trust boundary and its Authenticated Origin Pulls option: https://developers.cloudflare.com/ssl/origin-configuration/authenticated-origin-pull/
+
 ## [0.3.1] - 2026-02-24
 
 - Fix incorrect Cloudflare geolocation when an upstream proxy sits before Cloudflare

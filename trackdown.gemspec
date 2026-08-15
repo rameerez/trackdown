@@ -8,8 +8,12 @@ Gem::Specification.new do |spec|
   spec.authors = ["rameerez"]
   spec.email = ["rubygems@rameerez.com"]
 
-  spec.summary = "Get country, city, and emoji flag information for IP addresses using Cloudflare or MaxMind"
-  spec.description = "Trackdown is a Ruby gem that allows you to geolocate IP addresses easily. It works out of the box with Cloudflare headers if your Rails app is behind it; or you can also use MaxMind databases (BYOK). The gem offers a clean API for Rails applications to fetch country, city, emoji flag, region, continent, postal code, latitude, longitude and other GeoIP information for any IP address. Supports Cloudflare headers, and MaxMind GeoLite2 databases (offline capable)."
+  spec.summary = "Geolocate IP addresses using verified Cloudflare or CloudFront headers, or MaxMind"
+  spec.description = "Trackdown is a Ruby gem for IP geolocation in Rails applications. " \
+                     "It reads request-bound location headers from Cloudflare and Amazon CloudFront, " \
+                     "verifies CDN client-IP corroboration in automatic mode, or uses a local MaxMind " \
+                     "database (BYOK). It returns country, city, emoji flag, region, continent, postal " \
+                     "code, latitude, longitude, timezone, and related GeoIP fields."
   spec.homepage = "https://github.com/rameerez/trackdown"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.0.0"
@@ -42,7 +46,7 @@ Gem::Specification.new do |spec|
   #   gem 'maxmind-db', '~> 1.2'
   #   gem 'connection_pool', '~> 2.4'
   #
-  # For Cloudflare provider: No additional gems required!
+  # Cloudflare and Amazon CloudFront providers require no additional gems.
 
   # Development dependencies are managed in the Gemfile
 end

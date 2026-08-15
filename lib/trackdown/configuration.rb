@@ -10,18 +10,19 @@ end
 
 module Trackdown
   class Configuration
-    attr_accessor :provider, :maxmind_license_key, :maxmind_account_id, :database_path,
-                  :timeout, :pool_size, :pool_timeout, :memory_mode,
-                  :reject_private_ips
+    attr_reader :provider
+    attr_accessor :maxmind_license_key, :maxmind_account_id, :database_path,
+                  :timeout, :pool_size, :pool_timeout, :memory_mode, :reject_private_ips
 
     # Available provider types:
-    # :auto - Try Cloudflare first, fall back to MaxMind (recommended)
+    # :auto - Use one IP-corroborated CDN provider, otherwise fall back to MaxMind (recommended)
     # :cloudflare - Only use Cloudflare headers
+    # :cloudfront - Only use Amazon CloudFront headers
     # :maxmind - Only use MaxMind database
-    VALID_PROVIDERS = [:auto, :cloudflare, :maxmind].freeze
+    VALID_PROVIDERS = [:auto, :cloudflare, :cloudfront, :maxmind].freeze
 
     def initialize
-      @provider = :auto # Intelligent default: try Cloudflare first, fall back to MaxMind
+      @provider = :auto # Safe default: use one verified edge candidate, otherwise MaxMind
       @maxmind_license_key = nil
       @maxmind_account_id = nil
       @database_path = defined?(Rails) ? Rails.root.join('db', 'GeoLite2-City.mmdb').to_s : 'db/GeoLite2-City.mmdb'

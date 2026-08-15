@@ -45,6 +45,12 @@ class ConfigurationTest < Minitest::Test
     assert_equal :cloudflare, config.provider
   end
 
+  def test_accepts_valid_provider_cloudfront
+    config = Trackdown::Configuration.new
+    config.provider = :cloudfront
+    assert_equal :cloudfront, config.provider
+  end
+
   def test_accepts_valid_provider_maxmind
     config = Trackdown::Configuration.new
     config.provider = :maxmind
@@ -59,7 +65,7 @@ class ConfigurationTest < Minitest::Test
     end
 
     assert_match(/Invalid provider/, error.message)
-    assert_match(/auto, cloudflare, maxmind/, error.message)
+    assert_match(/auto, cloudflare, cloudfront, maxmind/, error.message)
   end
 
   def test_maxmind_license_key_can_be_set

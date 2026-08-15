@@ -10,6 +10,10 @@ module Trackdown
     #
     # Cloudflare must have "IP Geolocation" or "Add visitor location headers" enabled
     # in the dashboard under Network settings or via Managed Transforms
+    # Exact header contract:
+    # https://developers.cloudflare.com/fundamentals/reference/http-headers/
+    # Exact origin-protection guidance:
+    # https://developers.cloudflare.com/ssl/origin-configuration/authenticated-origin-pull/
     class CloudflareProvider < BaseProvider
       COUNTRY_HEADER = 'HTTP_CF_IPCOUNTRY'
       CITY_HEADER = 'HTTP_CF_IPCITY'
@@ -39,7 +43,7 @@ module Trackdown
         # @param ip [String] The IP address (not used, as Cloudflare already resolved it)
         # @param request [ActionDispatch::Request] Rails request object with Cloudflare headers
         # @return [LocationResult] The location information
-        def locate(ip, request: nil)
+        def locate(_ip, request: nil)
           raise Trackdown::Error, "CloudflareProvider requires a request object with Cloudflare headers" unless request
 
           country_code = extract_country_code(request)

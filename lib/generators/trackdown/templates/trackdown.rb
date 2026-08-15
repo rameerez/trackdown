@@ -7,15 +7,24 @@ Trackdown.configure do |config|
   # Choose your IP geolocation provider:
   #
   # :auto (recommended, default)
-  #   - Tries Cloudflare first (instant, zero overhead)
-  #   - Falls back to MaxMind if Cloudflare not available
-  #   - Perfect for hybrid deployments
+  #   - Verifies CDN geolocation against the CDN's client-IP header
+  #   - Supports Cloudflare and Amazon CloudFront
+  #   - Falls back to MaxMind when neither CDN can be verified
+  #   - Tries MaxMind, then Unknown, when both CDN candidates appear valid
   #
   # :cloudflare
   #   - Uses Cloudflare CF-IPCountry header
   #   - Requires: App behind Cloudflare + IP Geolocation enabled
   #   - Zero additional dependencies!
   #   - Must pass request object: Trackdown.locate(ip, request: request)
+  #
+  # :cloudfront
+  #   - Uses Amazon CloudFront CloudFront-Viewer-* headers
+  #   - Requires: a CloudFront origin request policy forwarding location headers
+  #   - Requires: direct-origin access blocked before headers can be trusted
+  #   - Must pass request object: Trackdown.locate(ip, request: request)
+  #   - Exact AWS header contract:
+  #     https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/adding-cloudfront-headers.html#cloudfront-headers-viewer-location
   #
   # :maxmind
   #   - Uses MaxMind GeoLite2 database
@@ -31,8 +40,29 @@ Trackdown.configure do |config|
   # 2. In Cloudflare dashboard → Network → Enable "IP Geolocation"
   #    OR under Rules → Transform Rules → Managed Transforms → Enable "Add visitor location headers"
   # 3. Use: Trackdown.locate(request.remote_ip, request: request)
+  # 4. Restrict direct-origin traffic before trusting CF-* headers:
+  #    https://developers.cloudflare.com/fundamentals/concepts/cloudflare-ip-addresses/#block-other-ip-addresses-recommended
+  #    https://developers.cloudflare.com/ssl/origin-configuration/authenticated-origin-pull/
   #
-  # That's it! No gems, no API keys, no database needed.
+  # No gems, API keys, or database are needed after the CDN/origin setup.
+
+  # ========================================
+  # Amazon CloudFront Setup (for :cloudfront or :auto providers)
+  # ========================================
+  # 1. Attach an origin request policy containing CloudFront's viewer-location
+  #    headers and CloudFront-Viewer-Address. Exact AWS policy documentation:
+  #    https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/controlling-origin-requests.html
+  # 2. Restrict the origin so direct clients cannot forge CloudFront-* headers.
+  #    AWS's exact custom-origin guidance:
+  #    https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/add-origin-custom-headers.html
+  #    https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-overview.html
+  # 3. Use: Trackdown.locate(request.remote_ip, request: request)
+  #
+  # AWS's AllViewerAndCloudFrontHeaders-2022-06 managed policy includes the
+  # required headers, but also forwards every viewer header, cookie, and query:
+  # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-origin-request-policies.html#managed-origin-request-policy-all-viewer-and-cloudfront
+  # Prefer a custom least-privilege policy, or explicitly select :cloudfront for
+  # a secured deployment where both CDN header families intentionally coexist.
 
   # ========================================
   # MaxMind Setup (for :maxmind or :auto providers)
