@@ -1,4 +1,12 @@
-## [Unreleased]
+## [0.4.0] - 2026-08-15
+
+Two things arrive together in this release.
+
+**Amazon CloudFront** joins Cloudflare and MaxMind as a first-class provider, so an app behind the AWS CDN gets the same header-based geolocation with no API keys, no database, and no extra gems.
+
+**Every result now explains how it knows what it knows.** A location on its own is a guess you cannot account for later; if you use one for a fraud check, an abuse report, or an audit trail, you also need to know which provider answered, when, how precise that provider says it is, whether you vouched for the request it came from, and — when there is no answer — exactly why. All of that now travels on the result, and none of it is guessed: a field the answering provider cannot supply is `nil`, never a plausible-looking placeholder.
+
+Upgrading is meant to be uneventful. Every existing reader, alias, and provider signature is unchanged, `to_h` still returns the same 13 keys in the same order, and `country_name` and `city` still say `"Unknown"` exactly as before. The one thing to check before upgrading is Ruby: the minimum is now 3.1.
 
 ### Provenance: every result now explains how it knows
 
@@ -30,7 +38,7 @@
 
 ### Serializing only what you want to keep
 
-- `to_h` accepts `only:`, `include_country_info:`, and `include_provenance:`. Callers can persist an explicit field allowlist—in the order named—without hand-building a hash or accidentally storing the large derived `country_info` payload. What you name is what you get: unknown fields raise and explicitly named fields are never dropped. `FIELDS` lists every valid name; `LOCATION_FIELDS`, `PROVENANCE_FIELDS`, and `LEGACY_FIELDS` are ready-made slices.
+- `to_h` accepts `only:`, `include_country_info:`, and `include_provenance:`. Callers can persist an explicit field allowlist—in the order named—without hand-building a hash or accidentally storing the large derived `country_info` payload. What you name is what you get: unknown fields raise and explicitly named fields are never dropped. `FIELDS` lists every valid name; `LOCATION_FIELDS`, `PROVENANCE_FIELDS`, and `DEFAULT_FIELDS` are ready-made slices.
 - The no-argument `to_h` remains API-compatible: the same 13 keys, in the same order, with the same values. `include_provenance: true` opts into every provenance field except the lazy database digest. This satisfies the exact compatibility requirement in issue #8: https://github.com/rameerez/trackdown/issues/8
 
 ### Compatibility
@@ -38,6 +46,9 @@
 - Every new constructor keyword is optional, and providers can build a result without supplying any of them.
 - `country_name` and `city` still return the display string `"Unknown"` when a provider has no value. New code should branch on `available?` / `unavailable_reason` and read `country_code`, which is `nil`, instead of parsing display strings.
 - No new runtime dependency, service, or network lookup.
+- **Ruby 3.1 or newer is now required**, up from 3.0. Ruby 3.0 reached end of life in March 2024 and is no longer tested anywhere. Sources: https://www.ruby-lang.org/en/downloads/branches/
+- The published gem now contains only the library and the files you would actually read — `lib/`, `README.md`, `CHANGELOG.md`, `LICENSE.txt`. Development scaffolding (`Rakefile`, `sig/`, `.simplecov`, agent instruction files) is no longer shipped to applications.
+- A test now asserts the dependency contract itself: every `require` in `lib/` has to name a declared runtime dependency, a gem that ships with the running Ruby, or something guarded by `rescue LoadError`. Ruby keeps moving former standard-library gems out of the default set — `bigdecimal` in 3.4 — and a require that works on a developer's machine can still be a `LoadError` in an application. Sources: https://docs.ruby-lang.org/en/3.4/standard_library_md.html
 
 ### Amazon CloudFront
 

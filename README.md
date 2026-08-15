@@ -75,7 +75,7 @@ By default, `trackdown` uses **`:auto` mode**. It uses an edge provider only whe
 
 ## Installation
 
-Add this line to your application's Gemfile:
+`trackdown` needs Ruby 3.1 or newer. Add this line to your application's Gemfile:
 
 ```ruby
 gem 'trackdown'
@@ -556,9 +556,9 @@ AbuseReport.create!(
 ```
 
 The names you can pass to `only:` are `Trackdown::LocationResult::FIELDS`. Three
-ready-made slices come with it: `LOCATION_FIELDS` (provider location fields),
-`PROVENANCE_FIELDS` (how we know), and `LEGACY_FIELDS` (the exact pre-provenance
-`to_h` shape, including `country_info`).
+ready-made slices come with it: `LOCATION_FIELDS` (where the IP is),
+`PROVENANCE_FIELDS` (how we know), and `DEFAULT_FIELDS` (exactly what a
+no-argument `to_h` returns, `country_info` included).
 
 ## Configuration
 

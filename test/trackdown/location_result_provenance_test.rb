@@ -310,15 +310,16 @@ class LocationResultProvenanceTest < Minitest::Test
   end
 
   def test_to_h_keeps_the_exact_pre_provenance_shape_by_default
-    assert_equal Trackdown::LocationResult::LEGACY_FIELDS, build.to_h.keys
-    assert_equal Trackdown::LocationResult::LEGACY_FIELDS, Trackdown::LocationResult::DEFAULT_FIELDS
+    assert_equal Trackdown::LocationResult::DEFAULT_FIELDS, build.to_h.keys
+    assert_equal Trackdown::LocationResult::LOCATION_FIELDS + %i[country_info],
+                 Trackdown::LocationResult::DEFAULT_FIELDS
+    assert_equal 13, build.to_h.length
   end
 
   def test_including_provenance_emits_every_field_except_the_expensive_digest
-    assert_equal %i[database_sha256],
-                 Trackdown::LocationResult::FIELDS - Trackdown::LocationResult::FIELDS_WITHOUT_DATABASE_SHA256
-    assert_equal Trackdown::LocationResult::FIELDS_WITHOUT_DATABASE_SHA256,
+    assert_equal Trackdown::LocationResult::FIELDS - %i[database_sha256],
                  build.to_h(include_provenance: true).keys
+    refute_includes build.to_h(include_provenance: true).keys, :database_sha256
   end
 
   def test_to_h_does_not_compute_the_digest_unless_you_name_it
@@ -416,7 +417,7 @@ class LocationResultProvenanceTest < Minitest::Test
       include_country_info: false
     )
 
-    assert_equal Trackdown::LocationResult::FIELDS_WITHOUT_DATABASE_SHA256 - %i[country_info], hash.keys
+    assert_equal Trackdown::LocationResult::FIELDS - %i[database_sha256 country_info], hash.keys
     assert_equal :maxmind, hash[:provider_name]
     refute_includes hash, :country_info
   end

@@ -57,13 +57,15 @@ module Trackdown
     # Every field #to_h can emit, in the order it emits them.
     FIELDS = (LOCATION_FIELDS + PROVENANCE_FIELDS + %i[country_info]).freeze
 
-    # The exact hash shape Trackdown returned before provenance existed. Keeping
-    # this as the no-argument default is an API compatibility guarantee.
-    LEGACY_FIELDS = (LOCATION_FIELDS + %i[country_info]).freeze
-    DEFAULT_FIELDS = LEGACY_FIELDS
+    # What a no-argument #to_h returns: the exact shape Trackdown returned before
+    # provenance existed, kept that way as an API compatibility guarantee. Ask for
+    # the rest with `include_provenance: true` or name it in `only:`.
+    DEFAULT_FIELDS = (LOCATION_FIELDS + %i[country_info]).freeze
 
-    # The whole result except the database digest, whose first read is expensive.
-    FIELDS_WITHOUT_DATABASE_SHA256 = (FIELDS - %i[database_sha256]).freeze
+    # The digest is the one field that costs real work — a full read of the
+    # database file — so nothing hands it to you unless you say its name.
+    FIELDS_EXCEPT_DIGEST = (FIELDS - %i[database_sha256]).freeze
+    private_constant :FIELDS_EXCEPT_DIGEST
 
     attr_reader :country_code, :country_name, :city, :flag_emoji,
                 :region, :region_code, :continent, :timezone, :latitude, :longitude,
@@ -231,9 +233,9 @@ module Trackdown
     end
 
     def provenance_fields(include_country_info:)
-      return FIELDS_WITHOUT_DATABASE_SHA256 if include_country_info
+      return FIELDS_EXCEPT_DIGEST if include_country_info
 
-      FIELDS_WITHOUT_DATABASE_SHA256 - %i[country_info]
+      FIELDS_EXCEPT_DIGEST - %i[country_info]
     end
 
     def validate!(value, allowed, description)
