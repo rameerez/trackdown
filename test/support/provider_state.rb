@@ -30,5 +30,16 @@ module TestHelpers
     ensure
       $stderr = original
     end
+
+    # Run a block in verbose mode and hand back everything Ruby itself complained
+    # about — a library must not make an application's logs noisy over input an
+    # attacker chose.
+    def capture_ruby_warnings
+      original_verbose = $VERBOSE
+      $VERBOSE = true
+      capture_stderr { yield }
+    ensure
+      $VERBOSE = original_verbose
+    end
   end
 end

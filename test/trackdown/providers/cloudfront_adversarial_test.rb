@@ -115,11 +115,12 @@ class CloudfrontProviderAdversarialTest < Minitest::Test
   end
 
   def test_rejects_every_non_finite_or_non_numeric_coordinate_spelling
-    # AWS defines these fields as geographic latitude/longitude values. BigDecimal
-    # lets Trackdown reject huge exponents before converting them to Float:
+    # AWS defines these fields as geographic latitude/longitude values, so anything
+    # that isn't a plain decimal is rejected before it is ever converted — huge
+    # exponents and hexadecimal included. Kernel#Float would read "0x10" as a
+    # perfectly valid latitude of 16.0.
     # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/adding-cloudfront-headers.html#cloudfront-headers-viewer-location
-    # https://docs.ruby-lang.org/en/3.3/BigDecimal.html
-    ["NaN", "Infinity", "-Infinity", "1e1000", "-1e1000", "1.2.3", "37N", "", " "].each do |coordinate|
+    ["NaN", "Infinity", "-Infinity", "1e1000", "-1e1000", "1.2.3", "37N", "", " ", "0x10", "1_0.5"].each do |coordinate|
       request = mock_cloudfront_request(country: "US", latitude: coordinate, longitude: coordinate)
       result = Trackdown::Providers::CloudfrontProvider.locate("203.0.113.9", request: request)
 

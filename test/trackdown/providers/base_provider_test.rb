@@ -76,6 +76,77 @@ class BaseProviderTest < Minitest::Test
     assert_equal 'Unknown', name
   end
 
+  # === Coordinates arrive in headers, so they are attacker-controlled ===
+
+  LATITUDE_RANGE = (-90.0..90.0)
+
+  def parse_latitude(value)
+    Trackdown::Providers::BaseProvider.send(:parse_coordinate, value, range: LATITUDE_RANGE)
+  end
+
+  def test_parse_coordinate_accepts_a_plain_decimal
+    assert_in_delta 37.7749, parse_latitude('37.7749')
+    assert_in_delta(-33.8688, parse_latitude('-33.8688'))
+    assert_in_delta 0.0, parse_latitude('0')
+    assert_in_delta 37.7, parse_latitude('+37.7')
+  end
+
+  def test_parse_coordinate_tolerates_surrounding_whitespace
+    assert_in_delta 37.7, parse_latitude("  37.7\n")
+  end
+
+  def test_parse_coordinate_accepts_the_exact_bounds
+    assert_in_delta 90.0, parse_latitude('90')
+    assert_in_delta(-90.0, parse_latitude('-90.0'))
+  end
+
+  def test_parse_coordinate_rejects_values_outside_the_bounds
+    assert_nil parse_latitude('90.1')
+    assert_nil parse_latitude('-90.1')
+  end
+
+  def test_parse_coordinate_rejects_hexadecimal
+    # Kernel#Float would read this as a perfectly valid latitude of 16.0.
+    assert_nil parse_latitude('0x10')
+    assert_nil parse_latitude('-0X4A')
+  end
+
+  def test_parse_coordinate_rejects_underscored_digits
+    assert_nil parse_latitude('1_0.5')
+  end
+
+  def test_parse_coordinate_rejects_the_special_float_literals
+    ['NaN', 'Infinity', '-Infinity', 'nan', 'inf'].each do |literal|
+      assert_nil parse_latitude(literal), "#{literal} is not a coordinate"
+    end
+  end
+
+  def test_parse_coordinate_rejects_junk
+    ['', '  ', 'abc', '1.2.3', '37N', '37,7', '.5', '5.', '1e', 'e5'].each do |junk|
+      assert_nil parse_latitude(junk), "#{junk.inspect} is not a coordinate"
+    end
+  end
+
+  def test_parse_coordinate_rejects_anything_that_is_not_a_string
+    [nil, 37.7749, :north, ['37.7'], Object.new].each do |value|
+      assert_nil parse_latitude(value)
+    end
+  end
+
+  def test_parse_coordinate_rejects_a_number_big_enough_to_overflow
+    ['1e1000', '-1e1000', '1e400', '1e-9999', '9' * 400, "#{'9' * 400}.5"].each do |overflowing|
+      assert_nil parse_latitude(overflowing)
+    end
+  end
+
+  def test_parse_coordinate_never_makes_ruby_warn_about_hostile_input
+    warnings = capture_ruby_warnings do
+      ['1e1000', '-1e1000', '1e-9999', '9' * 400, '0x10', 'NaN'].each { |value| parse_latitude(value) }
+    end
+
+    assert_empty warnings, "a forged header must not be able to make Trackdown warn: #{warnings}"
+  end
+
   def test_provider_name_raises_not_implemented_error
     error = assert_raises(NotImplementedError) do
       Trackdown::Providers::BaseProvider.provider_name

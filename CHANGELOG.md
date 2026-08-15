@@ -9,6 +9,7 @@
 - Cloudflare's `T1` (the Tor network) now keeps its country code but reports `:provider_returned_unknown_country` and a white unknown flag instead of a malformed regional-indicator glyph. `XX` and Unicode's `ZZ` unknown territory are unavailable. Cloudflare contract: https://developers.cloudflare.com/fundamentals/reference/http-headers/#cf-ipcountry. Unicode `XK`/`ZZ` semantics: https://www.unicode.org/reports/tr35/tr35-78/tr35.html#unicode_region_subtag_validity
 - Ignore non-string or malformed Cloudflare optional values and non-string, invalidly encoded, or malformed country values instead of allowing untrusted request data to raise from a lookup. Exact Cloudflare header contract: https://developers.cloudflare.com/fundamentals/reference/http-headers/
 - Apply finite WGS-84 latitude/longitude bounds to Cloudflare headers, matching CloudFront. Exact field source: https://developers.cloudflare.com/rules/transform/managed-transforms/reference/#add-visitor-location-headers. Exact bounds: https://www.rfc-editor.org/rfc/rfc5870#section-3.4.2
+- Accept a coordinate header only when it spells a plain decimal number. `Kernel#Float` reads `"0x10"` as a perfectly valid latitude of `16.0`, and converting an absurd exponent makes Ruby warn in verbose mode, so both are rejected before any conversion happens. This uses no library beyond Ruby itself: the gem's only runtime dependency is still `countries`.
 
 ### MaxMind accuracy and database provenance
 

@@ -171,7 +171,59 @@ class ProvenanceDocumentationTest < Minitest::Test
     assert_includes gemspec, 'spec.add_dependency "countries"'
   end
 
+  # Requiring something the gemspec doesn't declare makes the gem unloadable for
+  # anyone who doesn't already happen to have it — and Ruby keeps moving former
+  # standard-library gems out of the default set (bigdecimal in 3.4), so a require
+  # that works on the machine you wrote it on can still be a LoadError elsewhere.
+  # https://docs.ruby-lang.org/en/3.4/standard_library_md.html
+  def test_the_gem_only_requires_what_it_declares_or_what_ruby_itself_ships
+    declared = Gem::Specification.load(File.join(ROOT, 'trackdown.gemspec'))
+                                 .runtime_dependencies.map(&:name)
+
+    required_libraries.each do |library, file|
+      next if declared.include?(library)
+      next if OPTIONAL_LIBRARIES.include?(library)
+
+      assert shipped_with_ruby?(library),
+             "#{file} requires #{library.inspect}, which is neither a declared runtime dependency " \
+             "nor part of Ruby #{RUBY_VERSION} itself. Declare it in the gemspec, drop it, or — if it " \
+             'is genuinely optional — require it inside a rescue LoadError.'
+    end
+  end
+
+  def test_every_optional_library_is_required_defensively
+    OPTIONAL_LIBRARIES.each do |library|
+      files = required_libraries.select { |name, _| name == library }.map(&:last)
+
+      refute_empty files, "#{library} is listed as optional but nothing requires it any more"
+
+      files.each do |file|
+        assert_includes File.read(File.join(ROOT, file)), 'rescue LoadError',
+                        "#{file} requires the optional #{library} without rescuing LoadError"
+      end
+    end
+  end
+
   private
+
+  # Documented in the README as optional, and required inside a rescue LoadError.
+  OPTIONAL_LIBRARIES = %w[maxmind/db connection_pool].freeze
+
+  def required_libraries
+    Dir[File.join(ROOT, 'lib/**/*.rb')].sort.flat_map do |path|
+      file = path.delete_prefix("#{ROOT}/")
+      File.read(path).scan(/^\s*require ['"]([^'"]+)['"]/).flatten.map { |library| [library, file] }
+    end
+  end
+
+  # RubyGems is always present; everything else has to be a default gem for this
+  # Ruby, which is exactly the check that catches a gem leaving the default set.
+  def shipped_with_ruby?(library)
+    root = library.split('/').first
+    return true if root == 'rubygems'
+
+    Gem::Specification.find_all_by_name(root).any?(&:default_gem?)
+  end
 
   def read(relative_path)
     File.read(File.join(ROOT, relative_path))

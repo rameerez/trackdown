@@ -1,13 +1,25 @@
 # frozen_string_literal: true
 
 require 'countries'
-require 'bigdecimal'
 
 require_relative '../location_result'
 
 module Trackdown
   module Providers
     class BaseProvider
+      # What a CDN may legitimately send as a coordinate: a plain decimal number,
+      # and nothing else. Ruling the rest out here rather than after converting
+      # rejects hexadecimal ("0x10" is a perfectly good latitude of 16.0 to
+      # Kernel#Float), underscored digits, and the "NaN"/"Infinity" literals.
+      #
+      # The digit and exponent limits are not arbitrary: no WGS-84 coordinate
+      # exceeds 180, so three integer digits is already generous, and staying this
+      # side of Float's range means converting a forged header can never overflow.
+      # Ruby warns about an overflowing conversion in verbose mode, and untrusted
+      # input must not be able to make a library talk into someone's logs.
+      # https://www.rfc-editor.org/rfc/rfc5870#section-3.4.2
+      DECIMAL_COORDINATE_PATTERN = /\A[+-]?\d{1,3}(?:\.\d+)?(?:[eE][+-]?\d{1,2})?\z/
+      private_constant :DECIMAL_COORDINATE_PATTERN
       # Returns true if this provider can handle the given request/context
       def self.available?(request: nil)
         raise NotImplementedError, "#{self} must implement .available?"
@@ -71,21 +83,18 @@ module Trackdown
         LocationResult::UNKNOWN
       end
 
-      # Parse an untrusted decimal coordinate without allowing NaN, Infinity, or
-      # an out-of-range value through. BigDecimal accepts large exponents without
-      # Float's overflow warning; conversion to Float happens only after bounds.
-      # WGS-84 latitude/longitude bounds:
+      # Parse an untrusted coordinate: a plain decimal within the given WGS-84
+      # bounds, or nothing. The range check also settles NaN and Infinity, since
+      # a Range covers neither.
       # https://www.rfc-editor.org/rfc/rfc5870#section-3.4.2
-      # Ruby BigDecimal:
-      # https://docs.ruby-lang.org/en/3.3/BigDecimal.html
       def self.parse_coordinate(value, range:)
         return nil unless value.is_a?(String)
-        return nil if value.empty?
 
-        coordinate = BigDecimal(value, exception: false)
-        return nil unless coordinate&.finite? && range.cover?(coordinate)
+        decimal = value.strip
+        return nil unless DECIMAL_COORDINATE_PATTERN.match?(decimal)
 
-        coordinate.to_f
+        coordinate = decimal.to_f
+        range.cover?(coordinate) ? coordinate : nil
       end
 
       class << self
